@@ -9,10 +9,18 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 include(${PROJECT_PATH}/CMake/Common.cmake)
+############################################################
+# OpenMPApple
+############################################################
+if(APPLE)
+    INCLUDE(PatchOpenMPApple)
+    set(CMAKE_VERBOSE_MAKEFILE ON)
+    #SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
 
 add_definitions(-DSPH_DATA_PATH="../data")
 
-OPTION(USE_DOUBLE_PRECISION "Use double precision"	ON)
+OPTION(USE_DOUBLE_PRECISION "Use double precision" ON)
 if (USE_DOUBLE_PRECISION)
 	add_definitions( -DUSE_DOUBLE)	
 endif (USE_DOUBLE_PRECISION)
@@ -39,7 +47,6 @@ if (NOT SPH_LIBS_ONLY)
 	add_subdirectory(extern/glew)
 	add_subdirectory(Demos)
 endif()
-
 
 ## PositionBasedDynamics
 include(ExternalProject)

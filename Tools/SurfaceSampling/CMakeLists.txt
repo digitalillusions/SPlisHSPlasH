@@ -9,6 +9,6 @@ set_target_properties(SurfaceSampling PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POS
 set_target_properties(SurfaceSampling PROPERTIES RELWITHDEBINFO_POSTFIX ${CMAKE_RELWITHDEBINFO_POSTFIX})
 set_target_properties(SurfaceSampling PROPERTIES MINSIZEREL_POSTFIX ${CMAKE_MINSIZEREL_POSTFIX})
 add_dependencies(SurfaceSampling SPlisHSPlasH Utilities partio zlib MD5)
-target_link_libraries(SurfaceSampling SPlisHSPlasH Utilities partio zlib MD5)
+target_link_libraries(SurfaceSampling SPlisHSPlasH Utilities partio zlib MD5 ${OpenMP_omp_LIBRARY})
 
 set_target_properties(SurfaceSampling PROPERTIES FOLDER "Tools")

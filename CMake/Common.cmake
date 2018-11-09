@@ -15,16 +15,22 @@ if (WIN32)
 	SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MP") 
 endif (WIN32)
 
-if (UNIX)
+
+
+if (UNIX AND NOT APPLE)
     set(CMAKE_USE_RELATIVE_PATHS "1")
     # Set compiler flags for "release"
     set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -fopenmp") 
     SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fopenmp") 
-endif (UNIX)
+endif (UNIX AND NOT APPLE)
 
 if(APPLE)
-	set(CMAKE_MACOSX_RPATH 1)
-endif()
+    set(CMAKE_USE_RELATIVE_PATHS "1")
+    # Set compiler flags for "release"
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -Xpreprocessor -fopenmp")
+    SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Xpreprocessor -fopenmp")
+    set(CMAKE_MACOSX_RPATH 1)
+endif(APPLE)
 
 add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
 
