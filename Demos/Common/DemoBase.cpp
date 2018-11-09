@@ -116,9 +116,7 @@ void DemoBase::init(int argc, char **argv, const char *demoName)
 	m_exePath = FileSystem::getProgramPath();
 	m_dataPath = FileSystem::normalizePath(getExePath() + "/" + std::string(SPH_DATA_PATH));
 
-    //m_sceneFile = getDataPath() + "/Scenes/DoubleDamBreak.json"; //CHANGE THIS
-    m_sceneFile = "/Users/stefanjeske/workspace/SPlisHSPlasH/data/Scenes/DoubleDamBreak.json";
-
+	m_sceneFile = getDataPath() + "/Scenes/DoubleDamBreak.json";
 	setUseParticleCaching(true);
 	for (int i = 1; i < argc; i++)
 	{

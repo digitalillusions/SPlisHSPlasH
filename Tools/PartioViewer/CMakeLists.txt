@@ -6,11 +6,6 @@ if(WIN32)
   set(VIEWER_DEPENDENCIES freeglut ${VIEWER_DEPENDENCIES})
 else()
   find_package(GLUT REQUIRED)
-  if(APPLE)
-    #MESSAGE(STATUS "Glut libs are ${GLUT_LIBRARIES}")
-    set(GLUT_LIBRARIES "/usr/local/opt/freeglut/lib/libglut.dylib")
-    #set(GLUT_LIBRARIES "/usr/local/opt/freeglut/lib/libglut.dylib")
-  endif()
   find_package(OpenGL REQUIRED)
 
   set(VIEWER_LINK_LIBRARIES

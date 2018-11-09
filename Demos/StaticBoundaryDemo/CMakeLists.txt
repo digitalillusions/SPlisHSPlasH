@@ -6,18 +6,12 @@ if(WIN32)
   set(SIMULATION_DEPENDENCIES freeglut ${SIMULATION_DEPENDENCIES})
 else()
   find_package(GLUT REQUIRED)
-  if(APPLE)
-    #MESSAGE(STATUS "Glut libs are ${GLUT_LIBRARIES}")
-    set(GLUT_LIBRARIES "/usr/local/opt/freeglut/lib/libglut.dylib")
-    #set(GLUT_LIBRARIES "/usr/local/opt/freeglut/lib/libglut.dylib")
-  endif()
   find_package(OpenGL REQUIRED)
 
   set(SIMULATION_LINK_LIBRARIES
 	${SIMULATION_LINK_LIBRARIES}
 	${GLUT_LIBRARIES}
 	${OPENGL_LIBRARIES}
-        ${OpenMP_omp_LIBRARY}
   )
 endif()
 

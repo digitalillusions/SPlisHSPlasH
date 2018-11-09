@@ -57,7 +57,7 @@ int main( int argc, char **argv )
 			("i,input", "Input file (obj)", cxxopts::value<std::string>())
 			("o,output", "Output file (bgeo)", cxxopts::value<std::string>())
 			("r,radius", "Particle radius", cxxopts::value<Real>()->default_value("0.025"))
-            //("s,scale", "Scaling of input geometry (e.g. --scale \"1 2 3\")", cxxopts::value<Vector3r>())
+			("s,scale", "Scaling of input geometry (e.g. --scale \"1 2 3\")", cxxopts::value<Vector3r>())
 			;
 
 		options.parse(argc, argv);
