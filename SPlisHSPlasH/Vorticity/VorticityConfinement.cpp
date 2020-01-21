@@ -10,10 +10,14 @@ VorticityConfinement::VorticityConfinement(FluidModel *model) :
 {
 	m_omega.resize(model->numParticles(), Vector3r::Zero());
 	m_normOmega.resize(model->numParticles(), 0.0);
+
+	model->addField({ "angular velocity", FieldType::Vector3, [&](const unsigned int i) -> Real* { return &m_omega[i][0]; } });
 }
 
 VorticityConfinement::~VorticityConfinement(void)
 {
+	m_model->removeFieldByName("angular velocity");
+
 	m_omega.clear();
 	m_normOmega.clear();
 }
@@ -38,7 +42,6 @@ void VorticityConfinement::step()
 			const Vector3r &vi = m_model->getVelocity(i);
 			Vector3r &omegai = m_omega[i];
 			omegai.setZero();
-			Vector3r &ai = m_model->getAcceleration(i);
 			const Real density_i = m_model->getDensity(i);
 			const Real density_i2 = density_i *density_i;
 
@@ -64,7 +67,6 @@ void VorticityConfinement::step()
 		for (int i = 0; i < (int)numParticles; i++)
 		{
 			const Vector3r &xi = m_model->getPosition(i);
-			const Vector3r &vi = m_model->getVelocity(i);
 			Vector3r &ai = m_model->getAcceleration(i);
 			const Real density_i = m_model->getDensity(i);
 			const Real density_i2 = density_i *density_i;

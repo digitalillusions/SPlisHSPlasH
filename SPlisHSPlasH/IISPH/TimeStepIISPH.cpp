@@ -5,6 +5,11 @@
 #include <iostream>
 #include "Utilities/Timing.h"
 #include "SPlisHSPlasH/Simulation.h"
+#include "Utilities/Counting.h"
+#include "SPlisHSPlasH/BoundaryModel_Akinci2012.h"
+#include "SPlisHSPlasH/BoundaryModel_Koschier2017.h"
+#include "SPlisHSPlasH/BoundaryModel_Bender2019.h"
+
 
 using namespace SPH;
 using namespace std;
@@ -14,10 +19,37 @@ TimeStepIISPH::TimeStepIISPH() :
 {
 	m_simulationData.init();
 	m_counter = 0;
+
+	Simulation *sim = Simulation::getCurrent();
+	const unsigned int nModels = sim->numberOfFluidModels();
+	for (unsigned int fluidModelIndex = 0; fluidModelIndex < nModels; fluidModelIndex++)
+	{
+		FluidModel *model = sim->getFluidModel(fluidModelIndex);
+		model->addField({ "a_ii", FieldType::Scalar, [this, fluidModelIndex](const unsigned int i) -> Real* { return &m_simulationData.getAii(fluidModelIndex, i); } });
+		model->addField({ "d_ii", FieldType::Vector3, [this, fluidModelIndex](const unsigned int i) -> Real* { return &m_simulationData.getDii(fluidModelIndex, i)[0]; } });
+		model->addField({ "d_ij*p_j", FieldType::Vector3, [this, fluidModelIndex](const unsigned int i) -> Real* { return &m_simulationData.getDij_pj(fluidModelIndex, i)[0]; } });
+		model->addField({ "pressure", FieldType::Scalar, [this, fluidModelIndex](const unsigned int i) -> Real* { return &m_simulationData.getPressure(fluidModelIndex, i); }, true });
+		//model->addField({ "last pressure", FieldType::Scalar, [this, fluidModelIndex](const unsigned int i) -> Real* { return &m_simulationData.getLastPressure(fluidModelIndex, i); } });
+		model->addField({ "advected density", FieldType::Scalar, [this, fluidModelIndex](const unsigned int i) -> Real* { return &m_simulationData.getDensityAdv(fluidModelIndex, i); } });
+		model->addField({ "pressure acceleration", FieldType::Vector3, [this, fluidModelIndex](const unsigned int i) -> Real* { return &m_simulationData.getPressureAccel(fluidModelIndex, i)[0]; } });
+	}
 }
 
 TimeStepIISPH::~TimeStepIISPH(void)
 {
+	Simulation *sim = Simulation::getCurrent();
+	const unsigned int nModels = sim->numberOfFluidModels();
+	for (unsigned int fluidModelIndex = 0; fluidModelIndex < nModels; fluidModelIndex++)
+	{
+		FluidModel *model = sim->getFluidModel(fluidModelIndex);
+		model->removeFieldByName("a_ii");
+		model->removeFieldByName("d_ii");
+		model->removeFieldByName("d_ij*p_j");
+		model->removeFieldByName("pressure");
+		//model->removeFieldByName("last pressure");
+		model->removeFieldByName("advected density");
+		model->removeFieldByName("pressure acceleration");
+	}
 }
 
 void TimeStepIISPH::step()
@@ -31,6 +63,11 @@ void TimeStepIISPH::step()
 		clearAccelerations(fluidModelIndex);
 
 	performNeighborhoodSearch();
+
+	if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Bender2019)
+		computeVolumeAndBoundaryX();
+	else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Koschier2017)
+		computeDensityAndGradient();
 
 	for (unsigned int fluidModelIndex = 0; fluidModelIndex < nModels; fluidModelIndex++)
 		computeDensities(fluidModelIndex);
@@ -53,6 +90,7 @@ void TimeStepIISPH::step()
 		integration(fluidModelIndex);
 
 	sim->emitParticles();
+	sim->animateParticles();
 
 	// Compute new time	
 	tm->setTime (tm->getTime () + h);
@@ -71,7 +109,11 @@ void TimeStepIISPH::predictAdvection(const unsigned int fluidModelIndex)
 	Simulation *sim = Simulation::getCurrent();
 	FluidModel *model = sim->getFluidModel(fluidModelIndex);
 	const unsigned int numParticles = model->numActiveParticles();
+	if (numParticles == 0)
+		return;
+
 	const unsigned int nFluids = sim->numberOfFluidModels();
+	const unsigned int nBoundaries = sim->numberOfBoundaryModels();
 	const Real density0 = model->getDensity0();
 
 	const Real h = TimeManager::getCurrent()->getTimeStepSize();
@@ -85,11 +127,12 @@ void TimeStepIISPH::predictAdvection(const unsigned int fluidModelIndex)
 			Vector3r &vel = model->getVelocity(i);
 			const Vector3r &accel = model->getAcceleration(i);
 			Vector3r &dii = m_simulationData.getDii(fluidModelIndex, i);
+			dii.setZero();
 
-			vel += h * accel;
+			if (model->getParticleState(i) == ParticleState::Active)
+				vel += h * accel;
 
 			// Compute d_ii
-			dii.setZero();
 			const Real density = model->getDensity(i) / density0;
 			const Real density2 = density*density;
 			const Vector3r &xi = model->getPosition(i);
@@ -99,14 +142,29 @@ void TimeStepIISPH::predictAdvection(const unsigned int fluidModelIndex)
 			//////////////////////////////////////////////////////////////////////////
 			forall_fluid_neighbors(
 				dii -= fm_neighbor->getVolume(neighborIndex) / density2 * sim->gradW(xi - xj);
-			)
+			);
 
 			//////////////////////////////////////////////////////////////////////////
 			// Boundary
 			//////////////////////////////////////////////////////////////////////////
-			forall_boundary_neighbors(
-				dii -= bm_neighbor->getVolume(neighborIndex) / density2 * sim->gradW(xi - xj);
-			)
+			if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Akinci2012)
+			{
+				forall_boundary_neighbors(
+					dii -= bm_neighbor->getVolume(neighborIndex) / density2 * sim->gradW(xi - xj);
+				);
+			}
+			else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Koschier2017)
+			{
+				forall_density_maps(
+					dii += 1.0 / density2 * gradRho;
+				);
+			}
+			else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Bender2019)
+			{
+				forall_volume_maps(
+					dii -= Vj / density2 * sim->gradW(xi - xj);
+				);
+			}
 		}
 	}
 
@@ -128,15 +186,34 @@ void TimeStepIISPH::predictAdvection(const unsigned int fluidModelIndex)
 			forall_fluid_neighbors(
 				const Vector3r &vj = fm_neighbor->getVelocity(neighborIndex);
 				densityAdv += h*fm_neighbor->getVolume(neighborIndex) * (vi - vj).dot(sim->gradW(xi - xj));
-			)
+			);
 
 			//////////////////////////////////////////////////////////////////////////
 			// Boundary
 			//////////////////////////////////////////////////////////////////////////
-			forall_boundary_neighbors(
-				const Vector3r &vj = bm_neighbor->getVelocity(neighborIndex);
-				densityAdv += h*bm_neighbor->getVolume(neighborIndex) * (vi - vj).dot(sim->gradW(xi - xj));
-			)
+			if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Akinci2012)
+			{
+				forall_boundary_neighbors(
+					const Vector3r &vj = bm_neighbor->getVelocity(neighborIndex);
+					densityAdv += h*bm_neighbor->getVolume(neighborIndex) * (vi - vj).dot(sim->gradW(xi - xj));
+				);
+			}
+			else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Koschier2017)
+			{
+				forall_density_maps(
+					Vector3r vj;
+					bm_neighbor->getPointVelocity(xi, vj);
+					densityAdv -= h*(vi - vj).dot(gradRho);
+				);
+			}
+			else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Bender2019)
+			{
+				forall_volume_maps(
+					Vector3r vj;
+					bm_neighbor->getPointVelocity(xj, vj);
+					densityAdv += h*Vj * (vi - vj).dot(sim->gradW(xi - xj));
+				);
+			}
 
 			const Real &pressure = m_simulationData.getPressure(fluidModelIndex, i);
 			Real &lastPressure = m_simulationData.getLastPressure(fluidModelIndex, i);
@@ -145,6 +222,7 @@ void TimeStepIISPH::predictAdvection(const unsigned int fluidModelIndex)
 			// Compute a_ii
 			Real &aii = m_simulationData.getAii(fluidModelIndex, i);
 			aii = 0.0;
+
 			const Vector3r &dii = m_simulationData.getDii(fluidModelIndex, i);
 
 			const Real density2 = density * density;
@@ -158,16 +236,34 @@ void TimeStepIISPH::predictAdvection(const unsigned int fluidModelIndex)
 				const Vector3r kernel = sim->gradW(xi - xj);
 				const Vector3r dji = dpi * kernel;			
 				aii += fm_neighbor->getVolume(neighborIndex) * (dii - dji).dot(kernel);
-			)
+			);
 
 			//////////////////////////////////////////////////////////////////////////
 			// Boundary
 			//////////////////////////////////////////////////////////////////////////
-			forall_boundary_neighbors(
-				const Vector3r kernel = sim->gradW(xi - xj);
-				const Vector3r dji = dpi * kernel;			
-				aii += bm_neighbor->getVolume(neighborIndex) * (dii - dji).dot(kernel);
-			)
+			if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Akinci2012)
+			{
+				forall_boundary_neighbors(
+					const Vector3r kernel = sim->gradW(xi - xj);
+					const Vector3r dji = dpi * kernel;			
+					aii += bm_neighbor->getVolume(neighborIndex) * (dii - dji).dot(kernel);
+				);
+			}
+			else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Koschier2017)
+			{
+				forall_density_maps(
+					const Vector3r dji = -(1.0 / density2) * gradRho;
+					aii -= (dii - dji).dot(gradRho);
+				);
+			}
+			else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Bender2019)
+			{
+				forall_volume_maps(
+					const Vector3r kernel = sim->gradW(xi - xj);
+					const Vector3r dji = dpi * kernel;
+					aii += Vj * (dii - dji).dot(kernel);
+				);
+			}
 		}
 	}
 }
@@ -181,13 +277,13 @@ void TimeStepIISPH::pressureSolve()
 	m_iterations = 0;
 	bool chk = false;
 
-	while ((!chk || (m_iterations < 2)) && (m_iterations < m_maxIterations))
+	while ((!chk || (m_iterations < m_minIterations)) && (m_iterations < m_maxIterations))
 	{
 		chk = true;
 		for (unsigned int i = 0; i < nFluids; i++)
 		{
 			FluidModel *model = sim->getFluidModel(i);
-			const Real density0 = model->getValue<Real>(FluidModel::DENSITY0);
+			const Real density0 = model->getDensity0();
 
 			avg_density_err = 0.0;
 			pressureSolveIteration(i, avg_density_err);
@@ -199,6 +295,7 @@ void TimeStepIISPH::pressureSolve()
 
 		m_iterations++;
 	}
+	INCREASE_COUNTER("IISPH - iterations", m_iterations);
 }
 
 void TimeStepIISPH::pressureSolveIteration(const unsigned int fluidModelIndex, Real &avg_density_err)
@@ -206,9 +303,13 @@ void TimeStepIISPH::pressureSolveIteration(const unsigned int fluidModelIndex, R
 	Simulation *sim = Simulation::getCurrent();
 	FluidModel *model = sim->getFluidModel(fluidModelIndex);
 	const unsigned int numParticles = model->numActiveParticles();
-	const unsigned int nFluids = sim->numberOfFluidModels();
+	if (numParticles == 0)
+		return;
 
-	const Real density0 = model->getValue<Real>(FluidModel::DENSITY0);
+	const unsigned int nFluids = sim->numberOfFluidModels();
+	const unsigned int nBoundaries = sim->numberOfBoundaryModels();
+
+	const Real density0 = model->getDensity0();
 	const Real h = TimeManager::getCurrent()->getTimeStepSize();
 	const Real h2 = h*h;
 	const Real omega = 0.5;
@@ -221,6 +322,7 @@ void TimeStepIISPH::pressureSolveIteration(const unsigned int fluidModelIndex, R
 		{
 			Vector3r &dij_pj = m_simulationData.getDij_pj(fluidModelIndex, i);
 			dij_pj.setZero();
+
 			const Vector3r &xi = model->getPosition(i);
 
 			//////////////////////////////////////////////////////////////////////////
@@ -231,7 +333,7 @@ void TimeStepIISPH::pressureSolveIteration(const unsigned int fluidModelIndex, R
 				const Real densityj2 = densityj*densityj;
 
 				dij_pj -= fm_neighbor->getVolume(neighborIndex) / densityj2 * m_simulationData.getLastPressure(pid, neighborIndex) * sim->gradW(xi - xj);
-			)
+			);	
 		}
 	}
 
@@ -241,6 +343,9 @@ void TimeStepIISPH::pressureSolveIteration(const unsigned int fluidModelIndex, R
 		#pragma omp for schedule(static)  
 		for (int i = 0; i < (int)numParticles; i++)
 		{
+			Real &pi = m_simulationData.getPressure(fluidModelIndex, i);
+			pi = 0.0;
+
 			const Real &aii = m_simulationData.getAii(fluidModelIndex, i);
 			const Real density = model->getDensity(i) / density0;
 			const Vector3r &xi = model->getPosition(i);
@@ -263,18 +368,32 @@ void TimeStepIISPH::pressureSolveIteration(const unsigned int fluidModelIndex, R
 
 				// \sum ( mj * (\sum dij*pj - djj*pj - \sum_{k \neq i} djk*pk) * sim->gradW)
 				sum += fm_neighbor->getVolume(neighborIndex) * (m_simulationData.getDij_pj(fluidModelIndex, i) - m_simulationData.getDii(pid, neighborIndex)*m_simulationData.getLastPressure(pid, neighborIndex) - (d_jk_pk - d_ji_pi)).dot(kernel);
-			)
+			);
 
 			//////////////////////////////////////////////////////////////////////////
 			// Boundary
 			//////////////////////////////////////////////////////////////////////////
-			forall_boundary_neighbors(
-				sum += bm_neighbor->getVolume(neighborIndex) * m_simulationData.getDij_pj(fluidModelIndex, i).dot(sim->gradW(xi - xj));
-			)
+			if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Akinci2012)
+			{
+				forall_boundary_neighbors(
+					sum += bm_neighbor->getVolume(neighborIndex) * m_simulationData.getDij_pj(fluidModelIndex, i).dot(sim->gradW(xi - xj));
+				);
+			}
+			else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Koschier2017)
+			{
+				forall_density_maps(
+					sum -= m_simulationData.getDij_pj(fluidModelIndex, i).dot(gradRho);
+				);
+			}
+			else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Bender2019)
+			{
+				forall_volume_maps(
+					sum += Vj * m_simulationData.getDij_pj(fluidModelIndex, i).dot(sim->gradW(xi - xj));
+				);
+			}
 
 			const Real b = static_cast<Real>(1.0) - m_simulationData.getDensityAdv(fluidModelIndex, i);
 
-			Real &pi = m_simulationData.getPressure(fluidModelIndex, i);
 			const Real &lastPi = m_simulationData.getLastPressure(fluidModelIndex, i);
 			const Real denom = aii*h2;
 			if (fabs(denom) > 1.0e-9)
@@ -307,6 +426,8 @@ void TimeStepIISPH::integration(const unsigned int fluidModelIndex)
 	Simulation *sim = Simulation::getCurrent();
 	FluidModel *model = sim->getFluidModel(fluidModelIndex);
 	const unsigned int numParticles = model->numActiveParticles();
+	if (numParticles == 0)
+		return;
 
 	// Compute pressure forces
 	computePressureAccels(fluidModelIndex);
@@ -318,10 +439,13 @@ void TimeStepIISPH::integration(const unsigned int fluidModelIndex)
 		#pragma omp for schedule(static)  
 		for (int i = 0; i < (int) numParticles; i++)
 		{
-			Vector3r &pos = model->getPosition(i);
-			Vector3r &vel = model->getVelocity(i);
-			vel += m_simulationData.getPressureAccel(fluidModelIndex, i) * h;
-			pos += vel * h;
+			if (model->getParticleState(i) == ParticleState::Active)
+			{
+				Vector3r &pos = model->getPosition(i);
+				Vector3r &vel = model->getVelocity(i);
+				vel += m_simulationData.getPressureAccel(fluidModelIndex, i) * h;
+				pos += vel * h;
+			}
 		}
 	}
 }
@@ -332,6 +456,7 @@ void TimeStepIISPH::computePressureAccels(const unsigned int fluidModelIndex)
 	FluidModel *model = sim->getFluidModel(fluidModelIndex);
 	const unsigned int numParticles = model->numActiveParticles();
 	const unsigned int nFluids = sim->numberOfFluidModels();
+	const unsigned int nBoundaries = sim->numberOfBoundaryModels();
 	const Real density0 = model->getDensity0();
 
 	// Compute pressure forces
@@ -358,28 +483,50 @@ void TimeStepIISPH::computePressureAccels(const unsigned int fluidModelIndex)
 				const Real densityj2 = density_j*density_j;
 				const Real dpj = m_simulationData.getPressure(pid, neighborIndex) / densityj2;
 				ai -= fm_neighbor->getVolume(neighborIndex) * (dpi + fm_neighbor->getDensity0() / density0 * dpj) * sim->gradW(xi - xj);
-			)
+			);
 
 			//////////////////////////////////////////////////////////////////////////
 			// Boundary
 			//////////////////////////////////////////////////////////////////////////
-			forall_boundary_neighbors(
-				const Vector3r a = bm_neighbor->getVolume(neighborIndex) * (dpi)* sim->gradW(xi - xj);
-				ai -= a;
-				bm_neighbor->getForce(neighborIndex) += model->getMass(i) * a;
-			)
+			if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Akinci2012)
+			{
+				forall_boundary_neighbors(
+					const Vector3r a = bm_neighbor->getVolume(neighborIndex) * dpi * sim->gradW(xi - xj);
+					ai -= a;
+					bm_neighbor->addForce(xj, model->getMass(i) * a);
+				);
+			}
+			else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Koschier2017)
+			{
+				forall_density_maps(
+					const Vector3r a = -dpi * gradRho;
+					ai -= a;
+					bm_neighbor->addForce(xj, model->getMass(i) * a);
+				);
+			}
+			else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Bender2019)
+			{
+				forall_volume_maps(
+					const Vector3r a = Vj * dpi* sim->gradW(xi - xj);
+					ai -= a;
+					bm_neighbor->addForce(xj, model->getMass(i) * a);
+				);
+			}
 		}
 	}
 }
 
 void TimeStepIISPH::performNeighborhoodSearch()
 {
-	if (m_counter % 500 == 0)
+	if (Simulation::getCurrent()->zSortEnabled())
 	{
-		Simulation::getCurrent()->performNeighborhoodSearchSort();
-		m_simulationData.performNeighborhoodSearchSort();
+		if (m_counter % 500 == 0)
+		{
+			Simulation::getCurrent()->performNeighborhoodSearchSort();
+			m_simulationData.performNeighborhoodSearchSort();
+		}
+		m_counter++;
 	}
-	m_counter++;
 
 	Simulation::getCurrent()->performNeighborhoodSearch();
 }

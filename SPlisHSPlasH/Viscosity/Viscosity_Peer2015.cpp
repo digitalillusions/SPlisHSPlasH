@@ -20,10 +20,14 @@ Viscosity_Peer2015::Viscosity_Peer2015(FluidModel *model) :
 	m_iterations = 0;
 	m_maxIter = 50;
 	m_maxError = 0.01;
+
+	model->addField({ "target nablaV", FieldType::Matrix3, [&](const unsigned int i) -> Real* { return &m_targetNablaV[i](0,0); } });
 }
 
 Viscosity_Peer2015::~Viscosity_Peer2015(void)
 {
+	m_model->removeFieldByName("target nablaV");
+
 	m_targetNablaV.clear();
 }
 
@@ -38,12 +42,12 @@ void Viscosity_Peer2015::initParameters()
 
 	MAX_ITERATIONS = createNumericParameter("viscoMaxIter", "Max. iterations (visco)", &m_maxIter);
 	setGroup(MAX_ITERATIONS, "Viscosity");
-	setDescription(MAX_ITERATIONS, "Coefficient for the viscosity force computation");
+	setDescription(MAX_ITERATIONS, "Max. iterations of the viscosity solver.");
 	static_cast<NumericParameter<unsigned int>*>(getParameter(MAX_ITERATIONS))->setMinValue(1);
 
 	MAX_ERROR = createNumericParameter("viscoMaxError", "Max. visco error", &m_maxError);
 	setGroup(MAX_ERROR, "Viscosity");
-	setDescription(MAX_ERROR, "Coefficient for the viscosity force computation");
+	setDescription(MAX_ERROR, "Max. error of the viscosity solver.");
 	RealParameter* rparam = static_cast<RealParameter*>(getParameter(MAX_ERROR));
 	rparam->setMinValue(1e-6);
 }
@@ -53,6 +57,9 @@ void Viscosity_Peer2015::matrixVecProd(const Real* vec, Real *result, void *user
 	Simulation *sim = Simulation::getCurrent();
 	FluidModel *model = (FluidModel*)userData;
 	const unsigned int numParticles = model->numActiveParticles();
+	if (numParticles == 0)
+		return;
+
 	const unsigned int fluidModelIndex = model->getPointSetIndex();
 	const unsigned int nFluids = sim->numberOfFluidModels();
 
@@ -87,8 +94,11 @@ void Viscosity_Peer2015::step()
 {
 	Simulation *sim = Simulation::getCurrent();
 	const int numParticles = (int) m_model->numActiveParticles();
+	if (numParticles == 0)
+		return;
+
 	const Real viscosity = static_cast<Real>(1.0) - m_viscosity;
-	const Real density0 = m_model->getValue<Real>(FluidModel::DENSITY0);
+	const Real density0 = m_model->getDensity0();
 	const unsigned int fluidModelIndex = m_model->getPointSetIndex();
 	const unsigned int nFluids = sim->numberOfFluidModels();
 	FluidModel *model = m_model;

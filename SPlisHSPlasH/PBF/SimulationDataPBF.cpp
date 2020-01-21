@@ -67,8 +67,8 @@ void SimulationDataPBF::reset()
 		{
 			m_deltaX[i][j].setZero();
 			m_lambda[i][j] = 0.0;
-			getLastPosition(i, j) = fm->getPosition(i);
-			getOldPosition(i, j) = fm->getPosition(i);
+			getLastPosition(i, j) = fm->getPosition(j);
+			getOldPosition(i, j) = fm->getPosition(j);
 		}
 	}
 }
@@ -96,7 +96,6 @@ void SimulationDataPBF::performNeighborhoodSearchSort()
 void SimulationDataPBF::emittedParticles(FluidModel *model, const unsigned int startIndex)
 {
 	// initialize lastX values for new particles
-	Simulation *sim = Simulation::getCurrent();
 	const unsigned int fluidModelIndex = model->getPointSetIndex();
 	for (unsigned int j = startIndex; j < model->numActiveParticles(); j++)
 	{

@@ -45,20 +45,18 @@ int MiniGL::mouse_button = -1;
 int MiniGL::modifier_key = 0;
 int MiniGL::mouse_pos_x_old = 0;
 int MiniGL::mouse_pos_y_old = 0;
-void (*MiniGL::keyfunc [MAX_KEY_FUNC])(void) = {NULL, NULL};
-unsigned char MiniGL::key [MAX_KEY_FUNC] = {0,0};
-int MiniGL::numberOfKeyFunc = 0;
+std::vector<MiniGL::KeyFunction> MiniGL::keyfunc;
 int MiniGL::drawMode = GL_FILL;
 TwBar *MiniGL::m_tweakBar = NULL;
 Real MiniGL::m_time = 0.0;
 Real MiniGL::m_quat[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 unsigned char MiniGL::texData[IMAGE_ROWS][IMAGE_COLS][3];
 unsigned int MiniGL::m_texId = 0;
-void(*MiniGL::selectionfunc)(const Eigen::Vector2i&, const Eigen::Vector2i&, void*) = NULL;
+void(*MiniGL::selectionfunc)(const Vector2i&, const Vector2i&, void*) = NULL;
 void *MiniGL::selectionfuncClientData = NULL;
 void(*MiniGL::mousefunc)(int, int, void*) = NULL;
 int MiniGL::mouseFuncButton;
-Eigen::Vector2i MiniGL::m_selectionStart;
+Vector2i MiniGL::m_selectionStart;
 GLint MiniGL::m_context_major_version = 0;
 GLint MiniGL::m_context_minor_version = 0;
 GLint MiniGL::m_context_profile = 0;
@@ -90,10 +88,10 @@ void MiniGL::getOpenGLVersion(int &major_version, int &minor_version)
 
 void MiniGL::coordinateSystem() 
 {
-	Eigen::Vector3f a(0,0,0);
-	Eigen::Vector3f b(2,0,0);
-	Eigen::Vector3f c(0,2,0);
-	Eigen::Vector3f d(0,0,2);
+	Vector3f a(0,0,0);
+	Vector3f b(2,0,0);
+	Vector3f c(0,2,0);
+	Vector3f d(0,0,2);
 
 	float diffcolor [4] = {1,0,0,1};
 	float speccolor [4] = {1,1,1,1};
@@ -395,7 +393,7 @@ void MiniGL::drawTetrahedron(const Vector3r &a, const Vector3r &b, const Vector3
 	drawTriangle(b, c, d, normal4, color);
 }
 
-void MiniGL::drawGrid(float *color)
+void MiniGL::drawGrid_xz(float *color)
 {
 	float speccolor[4] = { 1.0, 1.0, 1.0, 1.0 };
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, color);
@@ -421,6 +419,35 @@ void MiniGL::drawGrid(float *color)
 	glVertex3f((float)size, 0.0f, 0.0f);
 	glVertex3f(0.0f, 0.0f, (float) -size);
 	glVertex3f(0.0f, 0.0f, (float) size);
+	glEnd();
+}
+
+void MiniGL::drawGrid_xy(float *color)
+{
+	float speccolor[4] = { 1.0, 1.0, 1.0, 1.0 };
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, color);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, color);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, speccolor);
+	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 100.0);
+
+	const int size = 5;
+
+	glBegin(GL_LINES);
+	for (int i = -size; i <= size; i++)
+	{
+		glVertex3f((float)i, (float)-size, 0.0f );
+		glVertex3f((float)i, (float)size, 0.0f);
+		glVertex3f((float)-size, (float)i, 0.0f);
+		glVertex3f((float)size, (float)i, 0.0f);
+	}
+	glEnd();
+
+	glLineWidth(3.0f);
+	glBegin(GL_LINES);
+	glVertex3f((float)-size, 0.0f, 0.0f);
+	glVertex3f((float)size, 0.0f, 0.0f);
+	glVertex3f(0.0f, (float)-size, 0.0f);
+	glVertex3f(0.0f, (float)size, 0.0f);
 	glEnd();
 }
 
@@ -663,7 +690,7 @@ void MiniGL::setMouseMoveFunc(int button, void(*func) (int, int, void*))
 }
 
 
-void MiniGL::setSelectionFunc(void(*func) (const Eigen::Vector2i&, const Eigen::Vector2i&, void*), void *clientData)
+void MiniGL::setSelectionFunc(void(*func) (const Vector2i&, const Vector2i&, void*), void *clientData)
 {
 	selectionfunc = func;
 	selectionfuncClientData = clientData;
@@ -709,18 +736,12 @@ void MiniGL::setClientIdleFunc (int hz, void (*func) (void))
 	}
 }
 
-void MiniGL::setKeyFunc (int nr, unsigned char k, void (*func) (void))
+void MiniGL::addKeyFunc (unsigned char k, std::function<void()> func)
 {
-	if ((nr >= MAX_KEY_FUNC) || (func == NULL))
-	{
+	if (func == nullptr)
 		return;
-	}
 	else
-	{
-		keyfunc[nr] = func;
-		key[nr] = k;
-		numberOfKeyFunc++;
-	}
+		keyfunc.push_back({ func, k });
 }
 
 void MiniGL::idle ()
@@ -759,10 +780,10 @@ void MiniGL::keyboard (unsigned char k, int x, int y)
 		rotateY(turnspeed);
 	else 
 	{
-		for (int i=0; i < numberOfKeyFunc; i++)
+		for (int i=0; i < keyfunc.size(); i++)
 		{
-			if (k == key[i])
-				keyfunc [i] ();
+			if (k == keyfunc[i].key)
+				keyfunc[i].fct();
 		}
 	}
 	glutPostRedisplay ();
@@ -899,15 +920,15 @@ void MiniGL::mousePress (int button, int state, int x, int y)
 		if (button == GLUT_LEFT_BUTTON)
 		{
 			if (state == GLUT_DOWN)
-				m_selectionStart = Eigen::Vector2i(x, y);
+				m_selectionStart = Vector2i(x, y);
 			else
 			{
 				if (m_selectionStart[0] != -1)
 				{
-					const Eigen::Vector2i pos(x, y);
+					const Vector2i pos(x, y);
 					selectionfunc(m_selectionStart, pos, selectionfuncClientData);
 				}
-				m_selectionStart = Eigen::Vector2i(-1, -1);
+				m_selectionStart = Vector2i(-1, -1);
 			}
 		}
 	}

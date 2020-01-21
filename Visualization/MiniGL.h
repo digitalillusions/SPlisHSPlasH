@@ -36,10 +36,9 @@ namespace SPH
 {
 	class MiniGL
 	{
-	#define MAX_KEY_FUNC 30
 	#define IMAGE_ROWS 128
 	#define IMAGE_COLS 128
-
+	
 	private:
 		struct Line
 		{
@@ -64,15 +63,19 @@ namespace SPH
 			float color[4];
 		};
 
+		struct KeyFunction
+		{
+			std::function<void()> fct;
+			unsigned char key;
+		};
+
 		static float fovy;
 		static float znear;
 		static float zfar;
 		static void (*scenefunc)(void);
 		static void (*exitfunc)(void);
 		static void (*idlefunc)(void);
-		static void (*keyfunc [MAX_KEY_FUNC])(void);
-		static unsigned char key [MAX_KEY_FUNC];
-		static int numberOfKeyFunc;
+		static std::vector<KeyFunction> keyfunc;
 		static int idlefunchz;
 		static int width;
 		static int height;
@@ -88,11 +91,11 @@ namespace SPH
 		static int drawMode;
 		static unsigned char texData[IMAGE_ROWS][IMAGE_COLS][3];		
 		static unsigned int m_texId;
-		static void(*selectionfunc) (const Eigen::Vector2i&, const Eigen::Vector2i&, void*);
+		static void(*selectionfunc) (const Vector2i&, const Vector2i&, void*);
 		static void* selectionfuncClientData;
 		static void(*mousefunc)(int, int, void*);
 		static int mouseFuncButton;		
-		static Eigen::Vector2i m_selectionStart;
+		static Vector2i m_selectionStart;
 		static TwBar *m_tweakBar;
 		static Real m_time;
 		static Real m_quat[4];
@@ -126,7 +129,8 @@ namespace SPH
 		*/
 		static void drawTetrahedron(const Vector3r &a, const Vector3r &b, const Vector3r &c, const Vector3r &d, float *color);
 		static void drawTriangle (const Vector3r &a, const Vector3r &b, const Vector3r &c, const Vector3r &norm, float *color);
-		static void drawGrid(float *color);
+		static void drawGrid_xz(float *color);
+		static void drawGrid_xy(float *color);
 		static void drawBitmapText (float x, float y, const char *str, int strLength, float *color);
 		static void drawStrokeText(const Real x, const Real y, const Real z, float scale, const char *str, int strLength, float *color);
 		static void drawStrokeText (const Vector3r &pos, float scale, const char *str, int strLength, float *color);
@@ -138,7 +142,8 @@ namespace SPH
 		static void setClientSceneFunc (void (*func)(void));
 		static void display ();
 		static void setClientIdleFunc (int hz, void (*func) (void));
-		static void setKeyFunc (int nr, unsigned char k, void (*func) (void));
+		static void addKeyFunc(unsigned char k, std::function<void()> func);
+		static std::vector<KeyFunction> &getKeyFunc() { return keyfunc; }
 		static void init(int argc, char **argv, const int width, const int height, const int posx, const int posy, const char *name);
 		static void destroy ();
 		static void viewport ();
@@ -153,16 +158,20 @@ namespace SPH
 		static void rotateY (Real y);
 		static void setProjectionMatrix (int width, int height);
 		static void drawTime(const Real time);
-		static void setSelectionFunc(void(*func) (const Eigen::Vector2i&, const Eigen::Vector2i&, void*), void *clientData);
+		static void setSelectionFunc(void(*func) (const Vector2i&, const Vector2i&, void*), void *clientData);
 		static void setMouseMoveFunc(int button, void(*func) (int, int, void*));
 		static void unproject(const int x, const int y, Vector3r &pos);
 		static float getZNear();
 		static float getZFar();
 		static void hsvToRgb(float h, float s, float v, float *rgb);
 		static void rgbToHsv(float r, float g, float b, float *hsv);
+		static int getModifierKey() { return modifier_key; }
 
 		static void setBreakPointActive(const bool active);
 		static void breakPoint();
+
+		static int getWidth() { return width; }
+		static int getHeight() { return height; }
 
 		static void initTweakBar();
 		static void initTweakBarParameters();

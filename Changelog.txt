@@ -1,3 +1,37 @@
+	- bugfixes
+
+2.5.0 
+	- added the boundary handling method "Volume Maps: An Implicit Boundary Representation for SPH"
+	- added the boundary handling method "Density Maps for Improved SPH Boundary Handling"
+	- added regular particle sampling
+	- PartioViewer can play sequences
+	- PartioViewer can write sequences as jpg files
+	- PartioViewer can generate movies using ffmpeg
+	- PartioViewer can render rigid body data	
+	- PartioViewer supports multiphase data
+	- user can now save/load the complete state of the simulation 
+	- bugfixes
+
+2.4.0
+	- added rigid body export
+	- added VTK file export (enables the data import in ParaView)
+	- added file dialog for Windows
+	- added a Python plugin for Maya to model scenes in Maya and export them to SPlisHSPlasH
+	- added animation fields to animate particles in an area using a math script
+	- improved fluid emitters	
+	- added option to simulate without GUI
+	- added GPU neighborhood search (cuNSearch) which can be selected in CMake
+
+2.3.0	
+	- added the Implicit SPH Formulation for Incompressible Linearly Elastic Solids of Peer et al. 2017
+	- added Corotated SPH for deformable solids of Becker et al. 2009
+	- SPlisHSPlasH now supports 2D simulations
+	- SPlisHSPlasH now has enhanced particle coloring
+	- partio export of arbitrary particle attributes is now supported
+	- renamed Static/DynamicBoundaryDemo to Static/DynamicBoundarySimulator
+	- added documentation of file format
+	- added colormaps
+	- fixed race condition
 	- fixed single precision build
 	- updated PositionBasedDynamics
 

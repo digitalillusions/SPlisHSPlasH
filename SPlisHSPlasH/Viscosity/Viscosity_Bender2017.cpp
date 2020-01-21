@@ -2,6 +2,9 @@
 #include "SPlisHSPlasH/TimeManager.h"
 #include "Utilities/Counting.h"
 #include "../Simulation.h"
+#include "SPlisHSPlasH/BoundaryModel_Akinci2012.h"
+#include "SPlisHSPlasH/BoundaryModel_Koschier2017.h"
+#include "SPlisHSPlasH/BoundaryModel_Bender2019.h"
 
 using namespace SPH;
 using namespace GenParam;
@@ -21,10 +24,18 @@ Viscosity_Bender2017::Viscosity_Bender2017(FluidModel *model) :
 	m_iterations = 0;
 	m_maxIter = 50;
 	m_maxError = 0.01;
+
+	model->addField({ "target strain rate", FieldType::Vector6, [&](const unsigned int i) -> Real* { return &m_targetStrainRate[i][0]; } });
+	model->addField({ "viscosity factor", FieldType::Matrix6, [&](const unsigned int i) -> Real* { return &m_viscosityFactor[i](0,0); } });
+	model->addField({ "viscosity lambda", FieldType::Vector6, [&](const unsigned int i) -> Real* { return &m_viscosityLambda[i][0]; } });
 }
 
 Viscosity_Bender2017::~Viscosity_Bender2017(void)
 {
+	m_model->removeFieldByName("target strain rate");
+	m_model->removeFieldByName("viscosity factor");
+	m_model->removeFieldByName("viscosity lambda");
+
 	m_targetStrainRate.clear();
 	m_viscosityFactor.clear();
 	m_viscosityLambda.clear();
@@ -41,12 +52,12 @@ void Viscosity_Bender2017::initParameters()
 
 	MAX_ITERATIONS = createNumericParameter("viscoMaxIter", "Max. iterations (visco)", &m_maxIter);
 	setGroup(MAX_ITERATIONS, "Viscosity");
-	setDescription(MAX_ITERATIONS, "Coefficient for the viscosity force computation");
+	setDescription(MAX_ITERATIONS, "Max. iterations of the viscosity solver.");
 	static_cast<NumericParameter<unsigned int>*>(getParameter(MAX_ITERATIONS))->setMinValue(1);
 
 	MAX_ERROR = createNumericParameter("viscoMaxError", "Max. visco error", &m_maxError);
 	setGroup(MAX_ERROR, "Viscosity");
-	setDescription(MAX_ERROR, "Coefficient for the viscosity force computation");
+	setDescription(MAX_ERROR, "Max. error of the viscosity solver.");
 	RealParameter* rparam = static_cast<RealParameter*>(getParameter(MAX_ERROR));
 	rparam->setMinValue(1e-6);
 }
@@ -55,12 +66,17 @@ void Viscosity_Bender2017::step()
 {
 	Simulation *sim = Simulation::getCurrent();
 	const int numParticles = (int) m_model->numActiveParticles();
+	if (numParticles == 0)
+		return;
+
 	const unsigned int nFluids = sim->numberOfFluidModels();
+	const unsigned int nBoundaries = sim->numberOfBoundaryModels();
 	FluidModel *model = m_model;
 	const unsigned int fluidModelIndex = model->getPointSetIndex();
 	const unsigned int maxIter = m_maxIter;
 	const Real maxError = m_maxError;	
 	const Real maxError2 = maxError*maxError;
+	const Real density0 = model->getDensity0();
 
 	const Real h = TimeManager::getCurrent()->getTimeStepSize();
 
@@ -185,10 +201,35 @@ void Viscosity_Bender2017::step()
 			//////////////////////////////////////////////////////////////////////////
 			// Boundary
 			//////////////////////////////////////////////////////////////////////////
-			forall_boundary_neighbors(
-				const Vector3r &vj = bm_neighbor->getVelocity(neighborIndex);
-				ai -= invH * 0.1 * m_viscosity * (bm_neighbor->getBoundaryPsi(neighborIndex) / density_i) * (vi - vj)* sim->W(xi - xj);
-			)
+			if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Akinci2012)
+			{
+				forall_boundary_neighbors(
+					const Vector3r &vj = bm_neighbor->getVelocity(neighborIndex);
+					const Vector3r a = -invH * 0.1 * m_viscosity * (density0 * bm_neighbor->getVolume(neighborIndex) / density_i) * (vi - vj)* sim->W(xi - xj);
+					ai += a;
+					bm_neighbor->addForce(xj, -m_model->getMass(i) * a);
+				);
+			}
+			else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Koschier2017)
+			{
+				forall_density_maps(
+					Vector3r vj;
+					bm_neighbor->getPointVelocity(xi, vj);
+					const Vector3r a = -invH * 0.1 * m_viscosity * (density0 / density_i) * (vi-vj)* rho;
+					ai += a;
+					bm_neighbor->addForce(xj, -m_model->getMass(i) * a);
+				);
+			}
+			else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Bender2019)
+			{
+				forall_volume_maps(
+					Vector3r vj;
+					bm_neighbor->getPointVelocity(xj, vj);
+					const Vector3r a = -invH * 0.1 * m_viscosity * (density0 * Vj / density_i) * (vi-vj)* sim->W(xi - xj);
+					ai += a;
+					bm_neighbor->addForce(xj, -m_model->getMass(i) * a);
+				);
+			}
 		}
 	}
 }

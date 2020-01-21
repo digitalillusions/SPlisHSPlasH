@@ -2,6 +2,10 @@
 #include <iostream>
 #include "../TimeManager.h"
 #include "../Simulation.h"
+#include "SPlisHSPlasH/BoundaryModel_Akinci2012.h"
+#include "SPlisHSPlasH/BoundaryModel_Koschier2017.h"
+#include "SPlisHSPlasH/BoundaryModel_Bender2019.h"
+
 
 using namespace SPH;
 using namespace GenParam;
@@ -17,10 +21,14 @@ MicropolarModel_Bender2017::MicropolarModel_Bender2017(FluidModel *model) :
 	m_angularAcceleration.resize(model->numParticles(), Vector3r::Zero());
 	m_inertiaInverse = 0.5;
 	m_viscosityOmega = 0.1;
+
+	model->addField({ "angular velocity", FieldType::Vector3, [&](const unsigned int i) -> Real* { return &m_omega[i][0]; }, true });
 }
 
 MicropolarModel_Bender2017::~MicropolarModel_Bender2017(void)
 {
+	m_model->removeFieldByName("angular velocity");
+
 	m_omega.clear();
 	m_angularAcceleration.clear();
 }
@@ -48,15 +56,27 @@ void MicropolarModel_Bender2017::step()
 {
 	Simulation *sim = Simulation::getCurrent();
 	const unsigned int numParticles = m_model->numActiveParticles();
+	if (numParticles == 0)
+		return;
+
 	const unsigned int fluidModelIndex = m_model->getPointSetIndex();
 	const unsigned int nFluids = sim->numberOfFluidModels();
+	const unsigned int nBoundaries = sim->numberOfBoundaryModels();
 	FluidModel *model = m_model;
+	const Real density0 = model->getDensity0();
 
-	const Real h = TimeManager::getCurrent()->getTimeStepSize();
-	const Real invH = static_cast<Real>(1.0) / h;
+	const Real dt = TimeManager::getCurrent()->getTimeStepSize();
+	const Real invDt = static_cast<Real>(1.0) / dt;
 
 	const Real nu_t = m_vorticityCoeff;
 	const Real zeta = m_viscosityOmega;
+
+	const Real h = sim->getSupportRadius();
+	const Real h2 = h*h;
+
+	Real d = 10.0;
+	if (sim->is2DSimulation())
+		d = 8.0;
 
 	#pragma omp parallel default(shared)
 	{
@@ -86,13 +106,84 @@ void MicropolarModel_Bender2017::step()
 				const Vector3r omegaij = omegai - omegaj;
 				const Vector3r gradW = sim->gradW(xij);
 
-				// XSPH for angular velocity field
-				angAcceli -= invH * m_inertiaInverse * zeta * (m_model->getMass(neighborIndex) / density_j) * omegaij * sim->W(xij);
+ 				// XSPH for angular velocity field
+ 				angAcceli -= invDt * m_inertiaInverse * zeta * (m_model->getMass(neighborIndex) / density_j) * omegaij * sim->W(xij);
+				
+				//// Viscosity
+				//angAcceli += d * m_inertiaInverse * zeta * (m_model->getMass(neighborIndex) / density_i) * omegaij.dot(xij) / (xij.squaredNorm() + 0.01*h2) * gradW;
 
-				// symmetric curl 
-				ai -= nu_t * density_i * m_model->getMass(neighborIndex) * ((omegai / density_i2 + omegaj / density_j2).cross(gradW));
-				angAcceli -= nu_t * density_i * m_inertiaInverse * (m_model->getMass(neighborIndex) * (vi / density_i2 + vj / density_j2).cross(gradW));
-			)
+ 				// difference curl 
+ 				ai += nu_t * 1.0/density_i * m_model->getMass(neighborIndex) * (omegaij.cross(gradW));
+ 				angAcceli += nu_t * 1.0/density_i * m_inertiaInverse * (m_model->getMass(neighborIndex) * (vi  - vj).cross(gradW));
+			);
+
+ 			//////////////////////////////////////////////////////////////////////////
+ 			// Boundary
+ 			//////////////////////////////////////////////////////////////////////////
+			if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Akinci2012)
+			{
+				forall_boundary_neighbors(
+ 					const Vector3r &vj = bm_neighbor->getVelocity(neighborIndex);
+ 					const Vector3r &omegaj = Vector3r::Zero();//m_omega[neighborIndex];
+ 
+ 					// Viscosity
+ 					const Vector3r xij = xi - xj;
+ 					const Vector3r omegaij = omegai - omegaj;
+ 					const Vector3r gradW = sim->gradW(xij);
+ 
+ 					// XSPH for angular velocity field
+ 					//angAcceli -= invDt * m_inertiaInverse * zeta * (density0 * bm_neighbor->getVolume(neighborIndex) / density_i) * omegaij * sim->W(xij);
+ 
+ 					// Viscosity
+					//angAcceli += d * m_inertiaInverse * zeta * (density0 * bm_neighbor->getVolume(neighborIndex) / density_i) * omegaij.dot(xij) / (xij.squaredNorm() + 0.01*h2) * gradW;
+ 
+					// difference curl 
+					const Vector3r a = nu_t * 1.0 / density_i * density0 * bm_neighbor->getVolume(neighborIndex) * (omegaij.cross(gradW));
+					ai += a;
+					angAcceli += nu_t * 1.0 / density_i * m_inertiaInverse * (density0 * bm_neighbor->getVolume(neighborIndex) * (vi - vj).cross(gradW));
+
+					bm_neighbor->addForce(xj, -model->getMass(i) * a);
+				);
+			}
+			else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Koschier2017)
+			{
+				forall_density_maps(
+					Vector3r vj;
+					bm_neighbor->getPointVelocity(xi, vj);
+					const Vector3r omegaij = omegai;		// ToDo: omega_j
+
+// 					// XSPH for angular velocity field
+// 					angAcceli -= invDt * m_inertiaInverse * zeta * (density0 / density_i) * omegaij * rho;
+
+					// difference curl 
+					const Vector3r a = nu_t * density0 / density_i * (omegaij.cross(gradRho));
+					ai += a;
+					angAcceli += nu_t * density0 / density_i * m_inertiaInverse * ((vi - vj).cross(gradRho));
+
+					bm_neighbor->addForce(xj, -model->getMass(i) * a);
+				);
+			}
+			else if (sim->getBoundaryHandlingMethod() == BoundaryHandlingMethods::Bender2019)
+			{
+				forall_volume_maps(
+					Vector3r vj;
+					bm_neighbor->getPointVelocity(xj, vj);
+					const Vector3r omegaij = omegai;		// ToDo: omega_j
+					
+					const Vector3r xij = xi - xj;
+					const Vector3r gradW = sim->gradW(xij);
+
+// 					// XSPH for angular velocity field
+// 					angAcceli -= invDt * m_inertiaInverse * zeta * (density0 * Vj / density_i) * omegaij * sim->W(xij);
+
+					// difference curl 
+					const Vector3r a = nu_t * 1.0 / density_i * density0 * Vj * (omegaij.cross(gradW));
+					ai += a;
+					angAcceli += nu_t * 1.0 / density_i * m_inertiaInverse * (density0 * Vj * (vi - vj).cross(gradW));
+
+					bm_neighbor->addForce(xj, -model->getMass(i) * a);
+				);
+			}
 			angAcceli -= 2.0 * m_inertiaInverse * nu_t * omegai;
 		}
 	}
@@ -102,7 +193,7 @@ void MicropolarModel_Bender2017::step()
 		#pragma omp for schedule(static)  
 		for (int i = 0; i < (int)numParticles; i++)
 		{
-			m_omega[i] += h*m_angularAcceleration[i];
+			m_omega[i] += dt*m_angularAcceleration[i];
 		}
 	}
 }

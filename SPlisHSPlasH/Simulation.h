@@ -5,8 +5,9 @@
 #include "FluidModel.h"
 #include "NonPressureForceBase.h"
 #include "ParameterObject.h"
-#include "CompactNSearch.h"
+#include "NeighborhoodSearch.h"
 #include "BoundaryModel.h"
+#include "AnimationFieldSystem.h"
 
 
 /** Loop over the fluid neighbors of all fluid phases. 
@@ -41,7 +42,7 @@
 #define forall_boundary_neighbors(code) \
 for (unsigned int pid = nFluids; pid < sim->numberOfPointSets(); pid++) \
 { \
-	BoundaryModel *bm_neighbor = sim->getBoundaryModelFromPointSet(pid); \
+	BoundaryModel_Akinci2012 *bm_neighbor = static_cast<BoundaryModel_Akinci2012*>(sim->getBoundaryModelFromPointSet(pid)); \
 	for (unsigned int j = 0; j < sim->numberOfNeighbors(fluidModelIndex, pid, i); j++) \
 	{ \
 		const unsigned int neighborIndex = sim->getNeighbor(fluidModelIndex, pid, i, j); \
@@ -50,9 +51,44 @@ for (unsigned int pid = nFluids; pid < sim->numberOfPointSets(); pid++) \
 	} \
 }
 
+/** Loop over the boundary density maps.
+* Simulation *sim, unsigned int nBoundaries and unsigned int fluidModelIndex must be defined.
+*/
+#define forall_density_maps(code) \
+for (unsigned int pid = 0; pid < nBoundaries; pid++) \
+{ \
+	BoundaryModel_Koschier2017 *bm_neighbor = static_cast<BoundaryModel_Koschier2017*>(sim->getBoundaryModel(pid)); \
+	const Real rho = bm_neighbor->getBoundaryDensity(fluidModelIndex, i); \
+	if (rho != 0.0) \
+	{ \
+		const Vector3r &gradRho = bm_neighbor->getBoundaryDensityGradient(fluidModelIndex, i).cast<Real>(); \
+		const Vector3r &xj = bm_neighbor->getBoundaryXj(fluidModelIndex, i); \
+		code \
+	} \
+}
+
+/** Loop over the boundary volume maps.
+* Simulation *sim, unsigned int nBoundaries and unsigned int fluidModelIndex must be defined.
+*/
+#define forall_volume_maps(code) \
+for (unsigned int pid = 0; pid < nBoundaries; pid++) \
+{ \
+	BoundaryModel_Bender2019 *bm_neighbor = static_cast<BoundaryModel_Bender2019*>(sim->getBoundaryModel(pid)); \
+	const Real Vj = bm_neighbor->getBoundaryVolume(fluidModelIndex, i);  \
+	if (Vj > 0.0) \
+	{ \
+		const Vector3r &xj = bm_neighbor->getBoundaryXj(fluidModelIndex, i); \
+		code \
+	} \
+}
+
+
+
+
 namespace SPH
 {
 	enum class SimulationMethods { WCSPH = 0, PCISPH, PBF, IISPH, DFSPH, PF, NumSimulationMethods };
+	enum class BoundaryHandlingMethods { Akinci2012 = 0, Koschier2017, Bender2019, NumSimulationMethods };
 
 	/** \brief Class to manage the current simulation time and the time step size. 
 	* This class is a singleton.
@@ -60,22 +96,30 @@ namespace SPH
 	class Simulation : public GenParam::ParameterObject
 	{
 	public:
+		static int SIM_2D;
 		static int PARTICLE_RADIUS;
 		static int GRAVITATION;
 		static int CFL_METHOD;
 		static int CFL_FACTOR;
 		static int CFL_MAX_TIMESTEPSIZE;
+		static int ENABLE_Z_SORT;
 
 		static int KERNEL_METHOD;
 		static int GRAD_KERNEL_METHOD;
 		static int ENUM_KERNEL_CUBIC;
+		static int ENUM_KERNEL_WENDLANDQUINTICC2;
 		static int ENUM_KERNEL_POLY6;
 		static int ENUM_KERNEL_SPIKY;
 		static int ENUM_KERNEL_PRECOMPUTED_CUBIC;
+		static int ENUM_KERNEL_CUBIC_2D;
+		static int ENUM_KERNEL_WENDLANDQUINTICC2_2D;
 		static int ENUM_GRADKERNEL_CUBIC;
+		static int ENUM_GRADKERNEL_WENDLANDQUINTICC2;
 		static int ENUM_GRADKERNEL_POLY6;
 		static int ENUM_GRADKERNEL_SPIKY;
 		static int ENUM_GRADKERNEL_PRECOMPUTED_CUBIC;
+		static int ENUM_GRADKERNEL_CUBIC_2D;
+		static int ENUM_GRADKERNEL_WENDLANDQUINTICC2_2D;
 
 		static int SIMULATION_METHOD;
 
@@ -90,12 +134,18 @@ namespace SPH
 		static int ENUM_SIMULATION_DFSPH;
 		static int ENUM_SIMULATION_PF;
 
+		static int BOUNDARY_HANDLING_METHOD;
+		static int ENUM_AKINCI2012;
+		static int ENUM_KOSCHIER2017;
+		static int ENUM_BENDER2019;
+
 		typedef PrecomputedKernel<CubicKernel, 10000> PrecomputedCubicKernel;
 
 	protected:
 		std::vector<FluidModel*> m_fluidModels;
 		std::vector<BoundaryModel*> m_boundaryModels;
-		CompactNSearch::NeighborhoodSearch *m_neighborhoodSearch;
+		NeighborhoodSearch *m_neighborhoodSearch;
+		AnimationFieldSystem *m_animationFieldSystem;
 		int m_cflMethod;
 		Real m_cflFactor;
 		Real m_cflMaxTimeStepSize;
@@ -109,7 +159,10 @@ namespace SPH
 		Vector3r m_gravitation;
 		Real m_particleRadius;
 		Real m_supportRadius;
+		bool m_sim2D;
+		bool m_enableZSort;
 		std::function<void()> m_simulationMethodChanged;		
+		int m_boundaryHandlingMethod;
 
 		virtual void initParameters();
 		
@@ -120,7 +173,7 @@ namespace SPH
 		Simulation ();
 		~Simulation ();
 
-		void init(const Real particleRadius);
+		void init(const Real particleRadius, const bool sim2D);
 		void reset();
 
 		// Singleton
@@ -133,13 +186,16 @@ namespace SPH
 		FluidModel *getFluidModelFromPointSet(const unsigned int pointSetIndex) { return static_cast<FluidModel*>(m_neighborhoodSearch->point_set(pointSetIndex).get_user_data()); }
 		const unsigned int numberOfFluidModels() const { return static_cast<unsigned int>(m_fluidModels.size()); }
 
-
-
-		void addBoundaryModel(RigidBodyObject *rbo, const unsigned int numBoundaryParticles, Vector3r *boundaryParticles);
+		void addBoundaryModel(BoundaryModel *bm);
 		BoundaryModel *getBoundaryModel(const unsigned int index) { return m_boundaryModels[index]; }
 		BoundaryModel *getBoundaryModelFromPointSet(const unsigned int pointSetIndex) { return static_cast<BoundaryModel*>(m_neighborhoodSearch->point_set(pointSetIndex).get_user_data()); }
 		const unsigned int numberOfBoundaryModels() const { return static_cast<unsigned int>(m_boundaryModels.size()); }
-		void updateBoundaryPsi();
+		void updateBoundaryVolume();
+
+		AnimationFieldSystem* getAnimationFieldSystem() { return m_animationFieldSystem; }
+		
+		BoundaryHandlingMethods getBoundaryHandlingMethod() const { return (BoundaryHandlingMethods) m_boundaryHandlingMethod; }
+		void setBoundaryHandlingMethod(BoundaryHandlingMethods val) { m_boundaryHandlingMethod = (int) val; }
 
 		int getKernel() const { return m_kernelMethod; }
 		void setKernel(int val);
@@ -157,6 +213,8 @@ namespace SPH
 
 		TimeStep *getTimeStep() { return m_timeStep; }
 
+		bool is2DSimulation() { return m_sim2D; }
+		bool zSortEnabled() { return m_enableZSort; }
 
 		void setParticleRadius(Real val);
 		Real getParticleRadius() const { return m_particleRadius; }
@@ -177,19 +235,18 @@ namespace SPH
 
 		void computeNonPressureForces();
 
+		void animateParticles();
 		void emitParticles();
 		virtual void emittedParticles(FluidModel *model, const unsigned int startIndex);
 
-		CompactNSearch::NeighborhoodSearch* getNeighborhoodSearch() { return m_neighborhoodSearch; }
+		NeighborhoodSearch* getNeighborhoodSearch() { return m_neighborhoodSearch; }
+
+		void saveState(BinaryFileWriter &binWriter);
+		void loadState(BinaryFileReader &binReader);
 
 		FORCE_INLINE unsigned int numberOfPointSets() const
 		{
 			return static_cast<unsigned int>(m_neighborhoodSearch->n_point_sets());
-		}
-
-		FORCE_INLINE unsigned int numberOfNeighbors(const unsigned int pointSetIndex, const unsigned int index) const
-		{
-			return static_cast<unsigned int>(m_neighborhoodSearch->point_set(0).n_neighbors(pointSetIndex, index));
 		}
 
 		FORCE_INLINE unsigned int numberOfNeighbors(const unsigned int pointSetIndex, const unsigned int neighborPointSetIndex, const unsigned int index) const
@@ -197,14 +254,18 @@ namespace SPH
 			return static_cast<unsigned int>(m_neighborhoodSearch->point_set(pointSetIndex).n_neighbors(neighborPointSetIndex, index));
 		}
 
-		FORCE_INLINE unsigned int getNeighbor(const unsigned int pointSetIndex, const unsigned int index, const unsigned int k) const
-		{
-			return m_neighborhoodSearch->point_set(0).neighbor(pointSetIndex, index, k);
-		}
-
 		FORCE_INLINE unsigned int getNeighbor(const unsigned int pointSetIndex, const unsigned int neighborPointSetIndex, const unsigned int index, const unsigned int k) const
 		{
 			return m_neighborhoodSearch->point_set(pointSetIndex).neighbor(neighborPointSetIndex, index, k);
+		}
+
+		FORCE_INLINE const unsigned int * getNeighborList(const unsigned int pointSetIndex, const unsigned int neighborPointSetIndex, const unsigned int index) const
+		{
+			#ifdef GPU_NEIGHBORHOOD_SEARCH
+			return m_neighborhoodSearch->point_set(pointSetIndex).neighbor_list(neighborPointSetIndex, index);
+			#else
+			return m_neighborhoodSearch->point_set(pointSetIndex).neighbor_list(neighborPointSetIndex, index).data();
+			#endif
 		}
 	};
 }

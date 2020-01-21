@@ -120,24 +120,58 @@ set(DRAG_SOURCE_FILES
 	Drag/DragForce_Macklin2014.cpp
 	)	
 	
+set(ELASTICITY_HEADER_FILES
+	Elasticity/ElasticityBase.h
+	Elasticity/Elasticity_Becker2009.h	
+	Elasticity/Elasticity_Peer2018.h
+	)
+	
+set(ELASTICITY_SOURCE_FILES
+	Elasticity/ElasticityBase.cpp
+	Elasticity/Elasticity_Becker2009.cpp
+	Elasticity/Elasticity_Peer2018.cpp
+	)	
+	
 set(UTILS_HEADER_FILES
-	Utilities/PoissonDiskSampling.h
+	Utilities/MathFunctions.h
+	Utilities/GaussQuadrature.h
 	Utilities/MatrixFreeSolver.h
+	Utilities/SurfaceSampling.h
+	Utilities/PoissonDiskSampling.h
+	Utilities/RegularTriangleSampling.h
+	Utilities/RegularSampling2D.h
 	Utilities/SceneLoader.h
+	Utilities/VolumeSampling.h
+	Utilities/SDFFunctions.h
+	Utilities/SimpleQuadrature.h
+	Utilities/WindingNumbers.h
 	)
 	
 set(UTILS_SOURCE_FILES
+	Utilities/MathFunctions.cpp
+	Utilities/GaussQuadrature.cpp
 	Utilities/PoissonDiskSampling.cpp
+	Utilities/RegularTriangleSampling.cpp
+	Utilities/RegularSampling2D.cpp
 	Utilities/SceneLoader.cpp
+	Utilities/VolumeSampling.cpp
+	Utilities/SDFFunctions.cpp
+	Utilities/SimpleQuadrature.cpp
+	Utilities/WindingNumbers.cpp
 	)	
 	
 find_package( Eigen3 REQUIRED )
-include_directories( ${EIGEN3_INCLUDE_DIR} )
+include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR} )
 
 ############################################################
 # CompactNSearch
 ############################################################
-include_directories(${PROJECT_PATH}/extern/install/CompactNSearch/include)
+include_directories(${PROJECT_PATH}/extern/install/NeighborhoodSearch/include)
+
+############################################################
+# DiscreGrid
+############################################################
+include_directories(${PROJECT_PATH}/extern/install/Discregrid/include)
 
 ############################################################
 # GenericParameters
@@ -147,8 +181,20 @@ include_directories(${PROJECT_PATH}/extern/install/GenericParameters/include)
 add_library(SPlisHSPlasH
 	Common.h
 	
+	NeighborhoodSearch.h
+
+	AnimationField.cpp
+	AnimationField.h
+	AnimationFieldSystem.h
+	AnimationFieldSystem.cpp
 	BoundaryModel.cpp
 	BoundaryModel.h
+	BoundaryModel_Akinci2012.cpp
+	BoundaryModel_Akinci2012.h
+	BoundaryModel_Bender2019.cpp
+	BoundaryModel_Bender2019.h
+	BoundaryModel_Koschier2017.cpp
+	BoundaryModel_Koschier2017.h
 	Emitter.cpp
 	Emitter.h
 	EmitterSystem.cpp
@@ -200,12 +246,16 @@ add_library(SPlisHSPlasH
 	${DRAG_HEADER_FILES}
 	${DRAG_SOURCE_FILES}
 
+	${ELASTICITY_HEADER_FILES}
+	${ELASTICITY_SOURCE_FILES}
+
 	${UTILS_HEADER_FILES}
 	${UTILS_SOURCE_FILES}
 )
 
-add_dependencies(SPlisHSPlasH Ext_CompactNSearch)
+add_dependencies(SPlisHSPlasH Ext_NeighborhoodSearch)
 add_dependencies(SPlisHSPlasH Ext_GenericParameters)
+add_dependencies(SPlisHSPlasH Ext_Discregrid)
 
 source_group("Header Files\\WCSPH" FILES ${WCSPH_HEADER_FILES})
 source_group("Source Files\\WCSPH" FILES ${WCSPH_SOURCE_FILES})
@@ -227,6 +277,8 @@ source_group("Header Files\\Vorticity" FILES ${VORTICITY_HEADER_FILES})
 source_group("Source Files\\Vorticity" FILES ${VORTICITY_SOURCE_FILES})
 source_group("Header Files\\Drag" FILES ${DRAG_HEADER_FILES})
 source_group("Source Files\\Drag" FILES ${DRAG_SOURCE_FILES})
+source_group("Header Files\\Elasticity" FILES ${ELASTICITY_HEADER_FILES})
+source_group("Source Files\\Elasticity" FILES ${ELASTICITY_SOURCE_FILES})
 source_group("Header Files\\Utils" FILES ${UTILS_HEADER_FILES})
 source_group("Source Files\\Utils" FILES ${UTILS_SOURCE_FILES})
 

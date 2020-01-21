@@ -1,13 +1,14 @@
 #version 330
 
 uniform float radius;
-uniform float max_velocity;
+uniform float min_scalar;
+uniform float max_scalar;
 uniform mat4 projection_matrix;
 
 in block
 {
 	flat vec3 mv_pos;
-	flat vec3 velocity;
+	flat float scalar_field;
 }
 In;
 
@@ -55,11 +56,12 @@ void main(void)
 
     gl_FragDepth = (depth + 1.0) / 2.0;
 
-	// modify color according to the velocity
+	// modify color according to the scalar field
 	vec3 hsv = rgb2hsv(color);
-	float v = length(In.velocity);
-	v = min((1.0/max_velocity)*v*v, 1.0);
-	vec3 fluidColor = hsv2rgb(vec3(hsv.x, max(0.8 - 0.8*v, 0.0), 1.0));
+	float v = max(In.scalar_field-min_scalar, 0.0);
+	float diff = abs(max_scalar-min_scalar);
+	v = min(v/diff, 1.0);
+	vec3 fluidColor = hsv2rgb(vec3(hsv.x, 1.0 - v, 1.0));
 
 	// compute final color
 	vec3 color_ = 0.25 * fluidColor;

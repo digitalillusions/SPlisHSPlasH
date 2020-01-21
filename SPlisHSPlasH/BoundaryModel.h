@@ -6,12 +6,13 @@
 
 #include "RigidBodyObject.h"
 #include "SPHKernels.h"
+#include "Utilities/BinaryFileReaderWriter.h"
 
 namespace SPH 
 {	
 	class TimeStep;
 
-	/** \brief The fluid model stores the particle and simulation information 
+	/** \brief The boundary model stores the information required for boundary handling
 	*/
 	class BoundaryModel 
 	{
@@ -21,116 +22,66 @@ namespace SPH
 
 		protected:
 			RigidBodyObject *m_rigidBody;
-			std::vector<Vector3r> m_x0;
-			std::vector<Vector3r> m_x;
-			std::vector<Vector3r> m_v;
-			std::vector<Real> m_V;
-			std::vector<Real> m_boundaryPsi;
-			std::vector<Vector3r> m_f;
-			bool m_sorted;
-			unsigned int m_pointSetIndex;
+			std::vector<Vector3r> m_forcePerThread;
+			std::vector<Vector3r> m_torquePerThread;
 
 		public:
-			unsigned int numberOfParticles() const { return static_cast<unsigned int>(m_x.size()); }
-
-			void computeBoundaryPsi(const Real density0);
-
 			virtual void reset();
 
-			void performNeighborhoodSearchSort();
+			virtual void performNeighborhoodSearchSort() {};
 
-			void initModel(RigidBodyObject *rbo, const unsigned int numBoundaryParticles, Vector3r *boundaryParticles);
+			virtual void saveState(BinaryFileWriter &binWriter) {};
+			virtual void loadState(BinaryFileReader &binReader) {};
+
 			RigidBodyObject* getRigidBodyObject() { return m_rigidBody; }
+
+			FORCE_INLINE void addForce(const Vector3r &pos, const Vector3r &f)
+			{
+				if (m_rigidBody->isDynamic())
+				{
+					#ifdef _OPENMP
+					int tid = omp_get_thread_num();
+					#else
+					int tid = 0;
+					#endif
+					m_forcePerThread[tid] += f;
+					m_torquePerThread[tid] += (pos - m_rigidBody->getPosition()).cross(f);
+				}
+			}
+
+#ifdef USE_AVX
+			FORCE_INLINE void addForce(const Vector3f8 &pos, const Vector3f8 &f, const unsigned int count)
+			{
+				if (m_rigidBody->isDynamic())
+				{
+					float fx[8];
+					float fy[8];
+					float fz[8];
+					f.x().store(fx);
+					f.y().store(fy);
+					f.z().store(fz);
+					float px[8];
+					float py[8];
+					float pz[8];
+					pos.x().store(px);
+					pos.y().store(py);
+					pos.z().store(pz);
+					for (unsigned int l = 0; l < count; l++)
+					{
+						addForce(Vector3r(px[l],py[l],pz[l]), Vector3r(fx[l],fy[l],fz[l]));
+					}
+				}
+			}
+#endif
+
 			
-			FORCE_INLINE Vector3r &getPosition0(const unsigned int i)
+			FORCE_INLINE void getPointVelocity(const Vector3r &x, Vector3r &res)
 			{
-				return m_x0[i];
+				res = m_rigidBody->getAngularVelocity().cross(x - m_rigidBody->getPosition()) + m_rigidBody->getVelocity();
 			}
 
-			FORCE_INLINE const Vector3r &getPosition0(const unsigned int i) const
-			{
-				return m_x0[i];
-			}
-
-			FORCE_INLINE void setPosition0(const unsigned int i, const Vector3r &pos)
-			{
-				m_x0[i] = pos;
-			}
-
-			FORCE_INLINE Vector3r &getPosition(const unsigned int i)
-			{
-				return m_x[i];
-			}
-
-			FORCE_INLINE const Vector3r &getPosition(const unsigned int i) const
-			{
-				return m_x[i];
-			}
-
-			FORCE_INLINE void setPosition(const unsigned int i, const Vector3r &pos)
-			{
-				m_x[i] = pos;
-			}
-
-			FORCE_INLINE Vector3r &getVelocity(const unsigned int i)
-			{
-				return m_v[i];
-			}
-
-			FORCE_INLINE const Vector3r &getVelocity(const unsigned int i) const
-			{
-				return m_v[i];
-			}
-
-			FORCE_INLINE void setVelocity(const unsigned int i, const Vector3r &vel)
-			{
-				m_v[i] = vel;
-			}
-			
-			FORCE_INLINE Vector3r &getForce(const unsigned int i)
-			{
-				return m_f[i];
-			}
-
-			FORCE_INLINE const Vector3r &getForce(const unsigned int i) const
-			{
-				return m_f[i];
-			}
-
-			FORCE_INLINE void setForce(const unsigned int i, const Vector3r &f)
-			{
-				m_f[i] = f;
-			}
-
-			FORCE_INLINE const Real& getVolume(const unsigned int i) const
-			{
-				return m_V[i];
-			}
-
-			FORCE_INLINE Real& getVolume(const unsigned int i)
-			{
-				return m_V[i];
-			}
-
-			FORCE_INLINE void setVolume(const unsigned int i, const Real &val)
-			{
-				m_V[i] = val;
-			}
-
-			FORCE_INLINE const Real& getBoundaryPsi(const unsigned int i) const
-			{
-				return m_boundaryPsi[i];
-			}
-
-			FORCE_INLINE Real& getBoundaryPsi(const unsigned int i)
-			{
-				return m_boundaryPsi[i];
-			}
-
-			FORCE_INLINE void setBoundaryPsi(const unsigned int i, const Real &val)
-			{
-				m_boundaryPsi[i] = val;
-			}
+			void getForceAndTorque(Vector3r &force, Vector3r &torque);
+			void clearForceAndTorque();
 	};
 }
 

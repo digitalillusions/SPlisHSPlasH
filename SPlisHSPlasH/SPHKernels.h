@@ -61,20 +61,17 @@ namespace SPH
 			Vector3r res;
 			const Real rl = r.norm();
 			const Real q = rl / m_radius;
-			if (q <= 1.0)
+			if ((rl > 1.0e-6) && (q <= 1.0))
 			{
-				if (rl > 1.0e-6)
+				const Vector3r gradq = r * (static_cast<Real>(1.0) / (rl*m_radius));
+				if (q <= 0.5)
 				{
-					const Vector3r gradq = r * (static_cast<Real>(1.0) / (rl*m_radius));
-					if (q <= 0.5)
-					{
-						res = m_l*q*((Real) 3.0*q - static_cast<Real>(2.0))*gradq;
-					}
-					else
-					{
-						const Real factor = static_cast<Real>(1.0) - q;
-						res = m_l*(-factor*factor)*gradq;
-					}
+					res = m_l*q*((Real) 3.0*q - static_cast<Real>(2.0))*gradq;
+				}
+				else
+				{
+					const Real factor = static_cast<Real>(1.0) - q;
+					res = m_l*(-factor*factor)*gradq;
 				}
 			}
 			else
@@ -269,6 +266,66 @@ namespace SPH
 		}
 	};
 
+	/** \brief quintic Wendland C2 kernel.
+	*/
+	class WendlandQuinticC2Kernel
+	{
+	protected:
+		static Real m_radius;
+		static Real m_k;
+		static Real m_l;
+		static Real m_W_zero;
+	public:
+		static Real getRadius() { return m_radius; }
+		static void setRadius(Real val)
+		{
+			m_radius = val;
+			static const Real pi = static_cast<Real>(M_PI);
+
+			const Real h3 = m_radius*m_radius*m_radius;
+			const Real h5 = h3*m_radius*m_radius;
+			m_k = static_cast<Real>(21.0) / (static_cast<Real>(2.0)*pi*h3);
+			m_l = -static_cast<Real>(210.0) / (pi*h3);
+			m_W_zero = W(0.0);
+		}
+
+	public:
+		static Real W(const Real r)
+		{
+			Real res = 0.0;
+			const Real q = r / m_radius;
+			if (q <= 1.0)
+				res = m_k * pow(static_cast<Real>(1.0) - q, 4) * (static_cast<Real>(4.0) * q + static_cast<Real>(1.0));
+			return res;
+		}
+
+		static Real W(const Vector3r &r)
+		{
+			return W(r.norm());
+		}
+
+		static Vector3r gradW(const Vector3r &r)
+		{
+			Vector3r res;
+			const Real rl = r.norm();
+			const Real q = rl / m_radius;			
+			if (q <= 1.0)
+			{
+				const Vector3r gradq = r * (static_cast<Real>(1.0) / (rl*m_radius));
+				res = m_l*gradq*pow(static_cast<Real>(1.0) - q, 3);
+			}
+			else
+				res.setZero();
+
+			return res;
+		}
+
+		static Real W_zero()
+		{
+			return m_W_zero;
+		}
+	};
+
 	/** \brief Cohesion kernel used for the surface tension method of Akinci el al. \cite Akinci:2013.
 	*/
 	class CohesionKernel
@@ -366,7 +423,6 @@ namespace SPH
 			const Real radius2 = m_radius*m_radius;
 			if (r2 <= radius2)
 			{
-				const Real r = sqrt(r2);
 				if (r > 0.5*m_radius)
 					res = m_k*pow(-static_cast<Real>(4.0)*r2 / m_radius + static_cast<Real>(6.0)*r - static_cast<Real>(2.0)*m_radius, static_cast<Real>(0.25));
 			}
@@ -380,10 +436,153 @@ namespace SPH
 			const Real radius2 = m_radius*m_radius;
 			if (r2 <= radius2)
 			{
-				const Real r = sqrt(r2);
-				if (r > 0.5*m_radius)
-					res = m_k*pow(-static_cast<Real>(4.0)*r2 / m_radius + static_cast<Real>(6.0)*r - static_cast<Real>(2.0)*m_radius, static_cast<Real>(0.25));
+				const Real rl = sqrt(r2);
+				if (rl > 0.5*m_radius)
+					res = m_k*pow(-static_cast<Real>(4.0)*r2 / m_radius + static_cast<Real>(6.0)*rl - static_cast<Real>(2.0)*m_radius, static_cast<Real>(0.25));
 			}
+			return res;
+		}
+
+		static Real W_zero()
+		{
+			return m_W_zero;
+		}
+	};
+
+
+	/** \brief Cubic spline kernel (2D).
+	*/
+	class CubicKernel2D
+	{
+	protected:
+		static Real m_radius;
+		static Real m_k;
+		static Real m_l;
+		static Real m_W_zero;
+	public:
+		static Real getRadius() { return m_radius; }
+		static void setRadius(Real val)
+		{
+			m_radius = val;
+			static const Real pi = static_cast<Real>(M_PI);
+
+			const Real h2 = m_radius*m_radius;
+			m_k = static_cast<Real>(40.0) / (static_cast<Real>(7.0) * (pi*h2));
+			m_l = static_cast<Real>(240.0) / (static_cast<Real>(7.0) * (pi*h2));
+
+			m_W_zero = W(Vector3r::Zero());
+		}
+
+	public:
+		static Real W(const Real r)
+		{
+			Real res = 0.0;
+			const Real q = r / m_radius;
+			if (q <= 1.0)
+			{
+				if (q <= 0.5)
+				{
+					const Real q2 = q*q;
+					const Real q3 = q2*q;
+					res = m_k * (static_cast<Real>(6.0)*q3 - static_cast<Real>(6.0)*q2 + static_cast<Real>(1.0));
+				}
+				else
+				{
+					res = m_k * (static_cast<Real>(2.0)*pow(static_cast<Real>(1.0) - q, 3));
+				}
+			}
+			return res;
+		}
+
+		static Real W(const Vector3r &r)
+		{
+			return W(r.norm());
+		}
+
+		static Vector3r gradW(const Vector3r &r)
+		{
+			Vector3r res;
+			const Real rl = r.norm();
+			const Real q = rl / m_radius;
+			if (q <= 1.0)
+			{
+				if (rl > 1.0e-6)
+				{
+					const Vector3r gradq = r * (static_cast<Real>(1.0) / (rl*m_radius));
+					if (q <= 0.5)
+					{
+						res = m_l*q*(static_cast<Real>(3.0)*q - static_cast<Real>(2.0))*gradq;
+					}
+					else
+					{
+						const Real factor = static_cast<Real>(1.0) - q;
+						res = m_l*(-factor*factor)*gradq;
+					}
+				}
+			}
+			else
+				res.setZero();
+
+			return res;
+		}
+
+		static Real W_zero()
+		{
+			return m_W_zero;
+		}
+	};
+
+	/** \brief Wendland Quintic C2 spline kernel (2D).
+	*/
+	class WendlandQuinticC2Kernel2D
+	{
+	protected:
+		static Real m_radius;
+		static Real m_k;
+		static Real m_l;
+		static Real m_W_zero;
+	public:
+		static Real getRadius() { return m_radius; }
+		static void setRadius(Real val)
+		{
+			m_radius = val;
+			static const Real pi = static_cast<Real>(M_PI);
+
+			const Real h2 = m_radius*m_radius;
+			m_k = static_cast<Real>(7.0) / (pi*h2);
+			m_l = -static_cast<Real>(140.0) / (pi*h2);
+
+			m_W_zero = W(Vector3r::Zero());
+		}
+
+	public:
+		static Real W(const Real r)
+		{
+			Real res = 0.0;
+			const Real q = r / m_radius;
+			if (q <= 1.0)
+				res = m_k * pow(static_cast<Real>(1.0) - q, 4) * (static_cast<Real>(4.0) * q + static_cast<Real>(1.0));
+			return res;
+		}
+
+		static Real W(const Vector3r &r)
+		{
+			return W(r.norm());
+		}
+
+		static Vector3r gradW(const Vector3r &r)
+		{
+			Vector3r res;
+			const Real rl = r.norm();
+			const Real q = rl / m_radius;
+			if (q <= 1.0)
+			{
+				const Vector3r gradq = r * (static_cast<Real>(1.0) / (rl*m_radius));
+				res = m_l*q*pow(static_cast<Real>(1.0) - q, 3)*gradq;
+			}
+			else
+				res.setZero();
+
 			return res;
 		}
 
@@ -398,13 +597,14 @@ namespace SPH
 	*
 	* The lookup tables can be used in combination with any kernel. 
 	*/
-	template<typename KernelType, unsigned int resolution = 1000u>
+	template<typename KernelType, unsigned int resolution = 10000u>
 	class PrecomputedKernel
 	{
 	protected:
 		static Real m_W[resolution];
 		static Real m_gradW[resolution + 1];
 		static Real m_radius;
+		static Real m_radius2;
 		static Real m_invStepSize;
 		static Real m_W_zero;
 	public:
@@ -412,8 +612,9 @@ namespace SPH
 		static void setRadius(Real val)
 		{
 			m_radius = val;
+			m_radius2 = m_radius * m_radius;
 			KernelType::setRadius(val);
-			const Real stepSize = m_radius / (Real)resolution;
+			const Real stepSize = m_radius / (Real)(resolution-1);
 			m_invStepSize = static_cast<Real>(1.0) / stepSize;
 			for (unsigned int i = 0; i < resolution; i++)
 			{
@@ -426,7 +627,7 @@ namespace SPH
 					m_gradW[i] = 0.0;
 			}
 			m_gradW[resolution] = 0.0;
-			m_W_zero = W(0.0);
+			m_W_zero = W(static_cast<Real>(0));
 		}
 
 	public:
@@ -434,12 +635,11 @@ namespace SPH
 		{
 			Real res = 0.0;
 			const Real r2 = r.squaredNorm();
-			const Real radius2 = m_radius*m_radius;
-			if (r2 <= radius2)
+			if (r2 <= m_radius2)
 			{
-				const Real r = sqrt(r2);
-				const unsigned int pos = std::min<unsigned int>((unsigned int)(r * m_invStepSize), resolution);
-				res = m_W[pos];
+				const Real rl = sqrt(r2);
+				const unsigned int pos = std::min<unsigned int>((unsigned int)(rl * m_invStepSize), resolution-2u);
+				res = static_cast<Real>(0.5)*(m_W[pos]+ m_W[pos+1]);
 			}
 			return res;
 		}
@@ -449,8 +649,8 @@ namespace SPH
 			Real res = 0.0;
 			if (r <= m_radius)
 			{
-				const unsigned int pos = std::min<unsigned int>((unsigned int)(r * m_invStepSize), resolution);
-				res = m_W[pos];
+				const unsigned int pos = std::min<unsigned int>((unsigned int)(r * m_invStepSize), resolution-2u);
+				res = static_cast<Real>(0.5)*(m_W[pos] + m_W[pos + 1]);
 			}
 			return res;
 		}
@@ -458,13 +658,12 @@ namespace SPH
 		static Vector3r gradW(const Vector3r &r)
 		{
 			Vector3r res;
-			const Real r2 = r.squaredNorm();
-			const Real radius2 = m_radius*m_radius;
-			if (r2 <= radius2)
+			const Real rl = r.norm();
+			if (rl <= m_radius)
 			{
-				const Real rl = sqrt(r2);
-				const unsigned int pos = std::min<unsigned int>((unsigned int)(rl * m_invStepSize), resolution);
-				res = m_gradW[pos] * r;
+				//const Real rl = sqrt(r2);
+				const unsigned int pos = std::min<unsigned int>(static_cast<unsigned int>(rl * m_invStepSize), resolution-2u);
+				res = static_cast<Real>(0.5)*(m_gradW[pos] + m_gradW[pos + 1]) * r;
 			}
 			else
 				res.setZero();
@@ -480,6 +679,8 @@ namespace SPH
 
 	template<typename KernelType, unsigned int resolution>
 	Real PrecomputedKernel<KernelType, resolution>::m_radius;
+	template<typename KernelType, unsigned int resolution>
+	Real PrecomputedKernel<KernelType, resolution>::m_radius2;
 	template<typename KernelType, unsigned int resolution>
 	Real PrecomputedKernel<KernelType, resolution>::m_W[resolution];
 	template<typename KernelType, unsigned int resolution>
