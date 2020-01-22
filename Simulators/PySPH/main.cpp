@@ -14,8 +14,10 @@ namespace py = pybind11;
 
 void SPHKernelsModule(py::module m);
 void AnimationFieldModule(py::module m);
+void UtilitiesModule(py::module m);
 
 PYBIND11_MODULE(PySPH, m){
 	SPHKernelsModule(m);
 	AnimationFieldModule(m);
+	UtilitiesModule(m);
 }

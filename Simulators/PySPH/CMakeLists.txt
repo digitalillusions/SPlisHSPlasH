@@ -56,6 +56,7 @@ pybind11_add_module(PySPH
   main.cpp 
   SPHKernelsModule.cpp
   AnimationFieldModule.cpp
+  UtilitiesModule.cpp
   ${VIS_FILES})
 
 # All the same postfix, otherwise the module name ist not the same as the exported name and python gets confused
