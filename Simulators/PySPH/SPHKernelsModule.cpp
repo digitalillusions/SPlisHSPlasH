@@ -5,14 +5,21 @@
 
 namespace py = pybind11;
 
+#ifdef PY_NO_CXX14
+template <typename... Args>
+using overload_cast_ = pybind11::detail::overload_cast_impl<Args...>;
+#else
+//using overload_cast_ = pybind11::overload_cast;
+#endif
+
 template<class T>
 py::class_<T> define_kernel(py::module m_sub, const char* name) {
 	auto cl = py::class_<T>(m_sub, name)
 		.def(py::init<>())
 		.def_static("getRadius", &T::getRadius)
 		.def_static("setRadius", &T::setRadius)
-		.def_static("W", py::overload_cast<const Real>(&T::W))
-		.def_static("W", py::overload_cast<const Vector3r&>(&T::W))
+		.def_static("W", overload_cast_<const Real>()(&T::W))
+		.def_static("W", overload_cast_<const Vector3r&>()(&T::W))
 		.def_static("gradW", &T::gradW)
 		.def_static("W_zero", &T::W_zero);
 
@@ -25,8 +32,8 @@ py::class_<T> define_kernel_no_grad(py::module m_sub, const char* name) {
 		.def(py::init<>())
 		.def_static("getRadius", &T::getRadius)
 		.def_static("setRadius", &T::setRadius)
-		.def_static("W", py::overload_cast<const Real>(&T::W))
-		.def_static("W", py::overload_cast<const Vector3r&>(&T::W))
+		.def_static("W", overload_cast_<const Real>()(&T::W))
+		.def_static("W", overload_cast_<const Vector3r&>()(&T::W))
 		.def_static("W_zero", &T::W_zero);
 
 	return cl;
