@@ -14,6 +14,7 @@
 #include <pybind11/eigen.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
+#include <pybind11/chrono.h>
 
 #ifdef PY_NO_CXX14
 template <typename... Args>
@@ -164,4 +165,32 @@ void UtilitiesModule(py::module m){
     // Timing
     // ---------------------------------------
     // TODO: Timing and find a way for everything to be actually printed
+    py::class_<Utilities::TimingHelper>(m_sub, "TimingHelper")
+            .def(py::init<>())
+            .def_readwrite("start", &Utilities::TimingHelper::start)
+            .def_readwrite("name", &Utilities::TimingHelper::name);
+
+    py::class_<Utilities::AverageTime>(m_sub, "AverageTime")
+            .def(py::init<>())
+            .def_readwrite("totalTime", &Utilities::AverageTime::totalTime)
+            .def_readwrite("counter", &Utilities::AverageTime::counter)
+            .def_readwrite("name", &Utilities::AverageTime::name);
+
+    py::class_<Utilities::IDFactory>(m_sub, "IDFactory")
+            .def(py::init<>())
+            .def_static("getId", &Utilities::IDFactory::getId);
+
+    py::class_<Utilities::Timing>(m_sub, "Timing")
+            .def(py::init<>())
+            .def_readwrite_static("m_dontPrintTimes", &Utilities::Timing::m_dontPrintTimes)
+            .def_readwrite_static("m_startCounter", &Utilities::Timing::m_startCounter)
+            .def_readwrite_static("m_stopCounter", &Utilities::Timing::m_stopCounter)
+            .def_readwrite_static("m_timingStack", &Utilities::Timing::m_timingStack)
+            .def_readwrite_static("m_averageTimes", &Utilities::Timing::m_averageTimes)
+            .def_static("reset", &Utilities::Timing::reset)
+            .def_static("startTiming", &Utilities::Timing::startTiming)
+            .def_static("stopTiming", overload_cast_<bool>()(&Utilities::Timing::stopTiming))
+            .def_static("stopTiming", overload_cast_<bool, int&>()(&Utilities::Timing::stopTiming))
+            .def_static("printAverageTimes", &Utilities::Timing::printAverageTimes)
+            .def_static("printTimeSums", &Utilities::Timing::printTimeSums);
 }

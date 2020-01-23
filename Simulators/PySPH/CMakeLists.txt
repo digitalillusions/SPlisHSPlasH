@@ -53,11 +53,12 @@ set(SIMULATION_DEPENDENCIES ${SIMULATION_DEPENDENCIES} Ext_GenericParameters)
 add_subdirectory(pybind11)
 
 pybind11_add_module(PySPH 
-  main.cpp 
-  SPHKernelsModule.cpp
+  main.cpp
   AnimationFieldModule.cpp
-  UtilitiesModule.cpp
+  BoundaryModelModule.cpp
   CommonModule.cpp
+  UtilitiesModule.cpp
+  SPHKernelsModule.cpp
   ${VIS_FILES})
 
 # All the same postfix, otherwise the module name ist not the same as the exported name and python gets confused

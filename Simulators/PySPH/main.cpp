@@ -12,14 +12,16 @@ INIT_COUNTING
 
 namespace py = pybind11;
 
-void CommonModule(py::module m);
-void SPHKernelsModule(py::module m);
-void AnimationFieldModule(py::module m);
-void UtilitiesModule(py::module m);
+void AnimationFieldModule(py::module);
+void CommonModule(py::module);
+void BoundaryModelModule(py::module);
+void UtilitiesModule(py::module);
+void SPHKernelsModule(py::module);
 
 PYBIND11_MODULE(PySPH, m){
     CommonModule(m);
 	SPHKernelsModule(m);
 	AnimationFieldModule(m);
 	UtilitiesModule(m);
+	BoundaryModelModule(m);
 }
