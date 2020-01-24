@@ -96,8 +96,7 @@ void UtilitiesModule(py::module m){
             .value("DEBUG", Utilities::LogLevel::DEBUG)
             .value("INFO", Utilities::LogLevel::INFO)
             .value("WARN", Utilities::LogLevel::WARN)
-            .value("ERR", Utilities::LogLevel::ERR)
-            .export_values();
+            .value("ERR", Utilities::LogLevel::ERR);
 
     py::class_<Utilities::ConsoleSink>(m_sub, "ConsoleSink")
             .def(py::init<>([](const Utilities::LogLevel minLevel){

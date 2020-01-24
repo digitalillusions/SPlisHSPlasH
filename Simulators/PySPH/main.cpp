@@ -15,6 +15,8 @@ namespace py = pybind11;
 void AnimationFieldModule(py::module);
 void CommonModule(py::module);
 void BoundaryModelModule(py::module);
+void EmitterModule(py::module m_sub);
+void FluidModelModule(py::module m_sub);
 void UtilitiesModule(py::module);
 void SPHKernelsModule(py::module);
 
@@ -24,4 +26,6 @@ PYBIND11_MODULE(PySPH, m){
 	AnimationFieldModule(m);
 	UtilitiesModule(m);
 	BoundaryModelModule(m);
+	EmitterModule(m);
+	FluidModelModule(m);
 }

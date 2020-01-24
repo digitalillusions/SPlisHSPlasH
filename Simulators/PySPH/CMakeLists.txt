@@ -59,6 +59,8 @@ pybind11_add_module(PySPH
   CommonModule.cpp
   UtilitiesModule.cpp
   SPHKernelsModule.cpp
+  EmitterModule.cpp
+  FluidModelModule.cpp
   ${VIS_FILES})
 
 # All the same postfix, otherwise the module name ist not the same as the exported name and python gets confused
