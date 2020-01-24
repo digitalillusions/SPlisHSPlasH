@@ -3,9 +3,9 @@ cmake_minimum_required(VERSION 3.2)
 project(PySPlisHSPlasH)
 
 # set(SIMULATION_LINK_LIBRARIES AntTweakBar glew SPlisHSPlasH Utilities partio zlib MD5 tinyexpr)
-set(SIMULATION_LINK_LIBRARIES glew SPlisHSPlasH Utilities partio zlib MD5 tinyexpr)
+set(SIMULATION_LINK_LIBRARIES SPlisHSPlasH Utilities partio zlib MD5 tinyexpr)
 # set(SIMULATION_DEPENDENCIES AntTweakBar glew SPlisHSPlasH Utilities partio zlib MD5 tinyexpr)
-set(SIMULATION_DEPENDENCIES glew SPlisHSPlasH Utilities partio zlib MD5 tinyexpr)
+set(SIMULATION_DEPENDENCIES SPlisHSPlasH Utilities partio zlib MD5 tinyexpr)
 
 if(WIN32)
   set(SIMULATION_LINK_LIBRARIES freeglut opengl32.lib glu32.lib ${SIMULATION_LINK_LIBRARIES})
@@ -61,7 +61,9 @@ pybind11_add_module(PySPH
   SPHKernelsModule.cpp
   EmitterModule.cpp
   FluidModelModule.cpp
-  ${VIS_FILES})
+  SimulationModule.cpp
+#  ${VIS_FILES}
+)
 
 # All the same postfix, otherwise the module name ist not the same as the exported name and python gets confused
 set_target_properties(PySPH PROPERTIES

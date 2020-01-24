@@ -11,12 +11,8 @@
 
 namespace py = pybind11;
 
-#ifdef PY_NO_CXX14
 template <typename... Args>
 using overload_cast_ = pybind11::detail::overload_cast_impl<Args...>;
-#else
-//using overload_cast_ = pybind11::overload_cast;
-#endif
 
 void BoundaryModelModule(py::module m_sub){
     // ---------------------------------------

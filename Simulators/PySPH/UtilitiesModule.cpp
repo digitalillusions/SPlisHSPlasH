@@ -16,12 +16,9 @@
 #include <pybind11/stl_bind.h>
 #include <pybind11/chrono.h>
 
-#ifdef PY_NO_CXX14
+
 template <typename... Args>
 using overload_cast_ = pybind11::detail::overload_cast_impl<Args...>;
-#else
-//using overload_cast_ = pybind11::overload_cast;
-#endif
 
 PYBIND11_MAKE_OPAQUE(std::vector<std::array<float, 3>>)
 PYBIND11_MAKE_OPAQUE(std::vector<std::array<float, 2>>)

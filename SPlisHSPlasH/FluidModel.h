@@ -283,7 +283,7 @@ namespace SPH
 				m_a[i] = accel;
 			}
 
-			FORCE_INLINE const Real getMass(const unsigned int i) const
+			FORCE_INLINE const Real& getMass(const unsigned int i) const 
 			{
 				return m_masses[i];
 			}
@@ -338,7 +338,7 @@ namespace SPH
 				m_particleState[i] = val;
 			}
 
-			FORCE_INLINE const Real getVolume(const unsigned int i) const
+			FORCE_INLINE const Real& getVolume(const unsigned int i) const
 			{
 				return m_V;
 			}

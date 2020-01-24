@@ -5,12 +5,8 @@
 
 namespace py = pybind11;
 
-#ifdef PY_NO_CXX14
 template <typename... Args>
 using overload_cast_ = pybind11::detail::overload_cast_impl<Args...>;
-#else
-//using overload_cast_ = pybind11::overload_cast;
-#endif
 
 template<class T>
 py::class_<T> define_kernel(py::module m_sub, const char* name) {
