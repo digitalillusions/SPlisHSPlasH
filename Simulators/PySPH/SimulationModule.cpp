@@ -113,7 +113,7 @@ void SimulationModule(py::module m_sub){
             .def("getSimulationMethod", &SPH::Simulation::getSimulationMethod)
             .def("setSimulationMethod", &SPH::Simulation::setSimulationMethod)
             .def("setSimulationMethodChangedCallback", &SPH::Simulation::setSimulationMethodChangedCallback)
-            .def("getTimeStep", &SPH::Simulation::getTimeStep, py::return_value_policy::reference_internal)
+            .def("getTimeStep", &SPH::Simulation::getTimeStep, py::return_value_policy::reference_internal) // TODO: This returns abstract class pointer, figure out what to do with it
             .def("is2DSimulation", &SPH::Simulation::is2DSimulation)
             .def("zSortEnabled", &SPH::Simulation::zSortEnabled)
             .def("setParticleRadius", &SPH::Simulation::setParticleRadius)

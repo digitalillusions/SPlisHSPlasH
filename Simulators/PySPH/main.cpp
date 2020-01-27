@@ -17,6 +17,7 @@ void CommonModule(py::module);
 void BoundaryModelModule(py::module);
 void EmitterModule(py::module);
 void FluidModelModule(py::module);
+void NonPressureForceBaseModule(py::module);
 void UtilitiesModule(py::module);
 void SimulationModule(py::module);
 void SPHKernelsModule(py::module);
@@ -24,16 +25,28 @@ void StaticRigidBodyModule(py::module);
 void TimeModule(py::module);
 void TriangleMeshModule(py::module);
 
-PYBIND11_MODULE(PySPH, m){
+void DFSPHModule(py::module);
+void DragModule(py::module);
+void ElasticityModule(py::module);
+void IISPHModule(py::module);
+
+
+PYBIND11_MODULE(PySPH, m) {
     CommonModule(m);
-	SPHKernelsModule(m);
-	AnimationFieldModule(m);
-	UtilitiesModule(m);
-	BoundaryModelModule(m);
-	EmitterModule(m);
-	FluidModelModule(m);
-	SimulationModule(m);
+    SPHKernelsModule(m);
+    AnimationFieldModule(m);
+    UtilitiesModule(m);
+    BoundaryModelModule(m);
+    EmitterModule(m);
+    FluidModelModule(m);
+    NonPressureForceBaseModule(m);
+    SimulationModule(m);
     StaticRigidBodyModule(m);
     TimeModule(m);
     TriangleMeshModule(m);
+
+    DFSPHModule(m);
+    DragModule(m);
+    ElasticityModule(m);
+    IISPHModule(m);
 }

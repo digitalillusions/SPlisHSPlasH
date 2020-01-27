@@ -61,10 +61,15 @@ pybind11_add_module(PySPH
   SPHKernelsModule.cpp
   EmitterModule.cpp
   FluidModelModule.cpp
+  NonPressureForceBaseModule.cpp
   SimulationModule.cpp
   StaticRigidBodyModule.cpp
   TimeModule.cpp
   TriangleMeshModule.cpp
+  DFSPHModule.cpp
+  DragModule.cpp
+  ElasticityModule.cpp
+  IISPHModule.cpp
 #  ${VIS_FILES}
 )
 
