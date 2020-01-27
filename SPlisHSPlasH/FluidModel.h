@@ -82,7 +82,9 @@ namespace SPH
 			static int ENUM_ELASTICITY_BECKER2009;
 			static int ENUM_ELASTICITY_PEER2018;
 			
-			FluidModel();
+			explicit FluidModel();
+			FluidModel(const FluidModel&) = delete;
+			FluidModel& operator=(const FluidModel&) = delete;
 			virtual ~FluidModel();
 
 			void init();

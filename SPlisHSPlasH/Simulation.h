@@ -170,7 +170,9 @@ namespace SPH
 		static Simulation *current;
 
 	public:
-		Simulation ();
+		explicit Simulation ();
+		Simulation(const Simulation&) = delete;
+		Simulation& operator=(const Simulation&) = delete;
 		~Simulation ();
 
 		void init(const Real particleRadius, const bool sim2D);
