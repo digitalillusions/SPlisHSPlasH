@@ -20,6 +20,9 @@ void FluidModelModule(py::module);
 void UtilitiesModule(py::module);
 void SimulationModule(py::module);
 void SPHKernelsModule(py::module);
+void StaticRigidBodyModule(py::module);
+void TimeModule(py::module);
+void TriangleMeshModule(py::module);
 
 PYBIND11_MODULE(PySPH, m){
     CommonModule(m);
@@ -30,4 +33,7 @@ PYBIND11_MODULE(PySPH, m){
 	EmitterModule(m);
 	FluidModelModule(m);
 	SimulationModule(m);
+    StaticRigidBodyModule(m);
+    TimeModule(m);
+    TriangleMeshModule(m);
 }

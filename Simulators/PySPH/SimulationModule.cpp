@@ -7,8 +7,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl_bind.h>
 
-#include <memory>
-
 namespace py = pybind11;
 
 void SimulationModule(py::module m_sub){

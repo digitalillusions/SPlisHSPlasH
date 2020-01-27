@@ -62,6 +62,9 @@ pybind11_add_module(PySPH
   EmitterModule.cpp
   FluidModelModule.cpp
   SimulationModule.cpp
+  StaticRigidBodyModule.cpp
+  TimeModule.cpp
+  TriangleMeshModule.cpp
 #  ${VIS_FILES}
 )
 
