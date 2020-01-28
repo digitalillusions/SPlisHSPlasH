@@ -29,6 +29,13 @@ void DFSPHModule(py::module);
 void DragModule(py::module);
 void ElasticityModule(py::module);
 void IISPHModule(py::module);
+void PBFModule(py::module);
+void PCISPHModule(py::module);
+void PFModule(py::module);
+void SurfaceTensionModule(py::module);
+void ViscosityModule(py::module);
+void VorticityModule(py::module);
+void WCSPHModule(py::module);
 
 
 PYBIND11_MODULE(PySPH, m) {
@@ -49,4 +56,11 @@ PYBIND11_MODULE(PySPH, m) {
     DragModule(m);
     ElasticityModule(m);
     IISPHModule(m);
+    PBFModule(m);
+    PCISPHModule(m);
+    PFModule(m);
+    SurfaceTensionModule(m);
+    ViscosityModule(m);
+    VorticityModule(m);
+    WCSPHModule(m);
 }

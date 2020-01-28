@@ -70,8 +70,17 @@ pybind11_add_module(PySPH
   DragModule.cpp
   ElasticityModule.cpp
   IISPHModule.cpp
+  PBFModule.cpp
+  PCISPHModule.cpp
+  PFModule.cpp
+  SurfaceTensionModule.cpp
+  ViscosityModule.cpp
+  VorticityModule.cpp
+  WCSPHModule.cpp
 #  ${VIS_FILES}
 )
+
+pybind11_add_module(PyTest test.cpp)
 
 # All the same postfix, otherwise the module name ist not the same as the exported name and python gets confused
 set_target_properties(PySPH PROPERTIES

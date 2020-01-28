@@ -1,6 +1,7 @@
 //
 // Created by sjeske on 1/22/20.
 //
+#include <SPlisHSPlasH/TimeStep.h>
 #include <SPlisHSPlasH/DFSPH/SimulationDataDFSPH.h>
 #include <SPlisHSPlasH/DFSPH/TimeStepDFSPH.h>
 
@@ -38,14 +39,11 @@ void DFSPHModule(py::module m_sub) {
     // ---------------------------------------
     // Class Time Step DFSPH
     // ---------------------------------------
-    py::class_<SPH::TimeStepDFSPH>(m_sub, "TimeStepDFSPH")
+    py::class_<SPH::TimeStepDFSPH, SPH::TimeStep>(m_sub, "TimeStepDFSPH")
             .def_readwrite_static("SOLVER_ITERATIONS_V", &SPH::TimeStepDFSPH::SOLVER_ITERATIONS_V)
             .def_readwrite_static("MAX_ITERATIONS_V", &SPH::TimeStepDFSPH::MAX_ITERATIONS_V)
             .def_readwrite_static("MAX_ERROR_V", &SPH::TimeStepDFSPH::MAX_ERROR_V)
             .def_readwrite_static("USE_DIVERGENCE_SOLVER", &SPH::TimeStepDFSPH::USE_DIVERGENCE_SOLVER)
 
-            .def(py::init<>())
-            .def("step", &SPH::TimeStepDFSPH::step)
-            .def("reset", &SPH::TimeStepDFSPH::reset)
-            .def("resize", &SPH::TimeStepDFSPH::resize);
+            .def(py::init<>());
 }
