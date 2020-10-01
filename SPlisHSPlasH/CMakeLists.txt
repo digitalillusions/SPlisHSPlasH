@@ -253,6 +253,7 @@ target_include_directories(SPlisHSPlasH PUBLIC
 
 target_link_libraries(SPlisHSPlasH
 	PUBLIC Utilities tinyexpr
+	$<${APPLE}:${OpenMP_omp_LIBRARY}>
 	INTERFACE
 	${NEIGHBORHOOD_SEARCH_LIBRARIES}
 	${DISCREGRID_LIBRARIES}
