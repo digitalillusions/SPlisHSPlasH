@@ -28,5 +28,5 @@ add_library(Utilities
 )
 
 add_dependencies(Utilities partio zlib)
-target_include_directories(Utilities PUBLIC ${TOPLEVEL_INCLUDE_DIR} ${EIGEN3_INCLUDE_DIR})
+target_include_directories(Utilities PUBLIC ${TOPLEVEL_INCLUDE_DIR} ${EIGEN3_INCLUDE_DIR} $<${APPLE}:${OpenMP_CXX_INCLUDE_DIR}>)
 target_link_libraries(Utilities INTERFACE partio zlib MD5)

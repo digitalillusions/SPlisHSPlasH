@@ -489,7 +489,7 @@ void MiniGL::init(int argc, char **argv, const int width, const int height, cons
 #ifdef __APPLE__
     /* We need to explicitly ask for a 3.2 context on OS X */
     glfwWindowHint (GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint (GLFW_CONTEXT_VERSION_MINOR, 2);
+    glfwWindowHint (GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint (GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint (GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 #endif

@@ -14,6 +14,10 @@
 #include <dirent.h>
 #endif
 
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+
 #ifndef S_ISDIR
 #define S_ISDIR(mode)  (((mode) & S_IFMT) == S_IFDIR)
 #endif
@@ -217,6 +221,9 @@ namespace Utilities
 			char buffer[1000];
 #ifdef WIN32	
 			GetModuleFileName(NULL, buffer, 1000);
+#elif __APPLE__
+			uint32_t bufsize = 1000;
+			_NSGetExecutablePath(buffer, &bufsize);
 #else
 			char szTmp[32];
 			sprintf(szTmp, "/proc/%d/exe", getpid());
