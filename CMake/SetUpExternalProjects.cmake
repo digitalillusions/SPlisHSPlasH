@@ -13,8 +13,8 @@ include(NeighborhoodSearch)
 ExternalProject_Add(
 	Ext_Discregrid
 	PREFIX "${CMAKE_BINARY_DIR}/extern/Discregrid"
-	GIT_REPOSITORY https://github.com/InteractiveComputerGraphics/Discregrid.git
-	GIT_TAG "0b69062ff9c56fbb6dcecd296652028bedbacf0e"
+	GIT_REPOSITORY https://github.com/digitalillusions/Discregrid.git
+	GIT_TAG "af3fdcb9248a463332396c5025c0576f849b5c35"
 	INSTALL_DIR ${ExternalInstallDir}/Discregrid
 	CMAKE_ARGS -DCMAKE_BUILD_TYPE:STRING=${EXT_CMAKE_BUILD_TYPE} -DCMAKE_INSTALL_PREFIX:PATH=${ExternalInstallDir}/Discregrid -DBUILD_CMD_EXECUTABLE:BOOL=0 -DEIGEN3_INCLUDE_DIR:PATH=${EIGEN3_INCLUDE_DIR} -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
 )
@@ -46,8 +46,8 @@ include(ExternalProject)
 ExternalProject_Add(
 	Ext_PBD
 	PREFIX "${CMAKE_BINARY_DIR}/extern/PositionBasedDynamics"
-	GIT_REPOSITORY https://github.com/InteractiveComputerGraphics/PositionBasedDynamics.git
-	GIT_TAG "67cea4478d58de55f64f78fcfea16629bfb79152"
+	GIT_REPOSITORY https://github.com/digitalillusions/PositionBasedDynamics.git
+	GIT_TAG "80bb39a7bb17d27c46fe7ae0c8a8f1a04ddd8be4"
 	INSTALL_DIR ${ExternalInstallDir}/PositionBasedDynamics
 	DEPENDS Ext_GenericParameters Ext_Discregrid
 	CMAKE_ARGS -DCMAKE_BUILD_TYPE=${EXT_CMAKE_BUILD_TYPE}
