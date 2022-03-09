@@ -483,9 +483,13 @@ void MiniGL::init(int argc, char **argv, const int width, const int height, cons
 	if (!glfwInit())
 		exit(EXIT_FAILURE);
 
-	//glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	//glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	//glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	#ifdef __APPLE__
+		glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	#endif
+
 
 	//glfwWindowHint(GLFW_DOUBLEBUFFER, GL_FALSE);
 	m_glfw_window = glfwCreateWindow(width, height, name, NULL, NULL);
